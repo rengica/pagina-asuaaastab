@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documento Equivalente</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <div class="container my-5">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                <h4 class="mb-0 fw-bold">Generar Documento Equivalente</h4>
+                <a href="{{ url_for('documentos') }}" class="btn btn-outline-light btn-sm">Volver a Documentos</a>
+            </div>
+            
+            <div class="card-body p-4">
+                <form action="{{ url_for('documento_equivalente') }}" method="POST">
+                    
+                    <!-- Datos de Control (Consecutivo y Fecha) -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="consecutivo" class="form-label fw-bold text-secondary">Consecutivo N°:</label>
+                            <input type="text" id="consecutivo" name="consecutivo" value="{{ consecutivo }}" readonly class="form-control bg-light text-primary fw-bold fs-5">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="fecha" class="form-label fw-bold text-secondary">Fecha de Expedición:</label>
+                            <input type="date" id="fecha" name="fecha" value="{{ datetime }}" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <!-- Información del Beneficiario -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <label for="beneficiario" class="form-label fw-bold text-secondary">Nombre / Razón Social:</label>
+                            <input type="text" id="beneficiario" name="beneficiario" class="form-control" placeholder="Nombre completo" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="documento" class="form-label fw-bold text-secondary">C.C. / NIT:</label>
+                            <input type="text" id="documento" name="documento" class="form-control" placeholder="Número de documento" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="direccion" class="form-label fw-bold text-secondary">Dirección / Teléfono:</label>
+                            <input type="text" id="direccion" name="direccion" class="form-control" placeholder="Dirección de contacto">
+                        </div>
+                    </div>
+
+                    <hr class="my-4 text-muted">
+
+                    <!-- Tabla de Conceptos / Ítems -->
+                    <h5 class="fw-bold text-secondary mb-3">Detalle de la Transacción</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle">
+                            <thead class="table-secondary text-center">
+                                <tr>
+                                    <th style="width: 50%;">Descripción / Concepto</th>
+                                    <th style="width: 25%;">Valor Unitario ($)</th>
+                                    <th style="width: 25%;">Valor Total ($)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i in range(6) %}
+                                <tr>
+                                    <td>
+                                        <input type="text" name="concepto[]" class="form-control" placeholder="Descripción del concepto {{ i + 1 }}">
+                                    </td>
+                                    <td>
+                                        <input type="number" step="any" name="v_unitario[]" class="form-control text-end" placeholder="0.00">
+                                    </td>
+                                    <td>
+                                        <input type="number" step="any" name="total[]" class="form-control text-end" placeholder="0.00">
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Retenciones -->
+                    <div class="row justify-content-end my-4">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="retefuente" class="form-label fw-bold text-secondary">Retención en la Fuente ($):</label>
+                                <input type="number" step="any" id="retefuente" name="retefuente" class="form-control text-end" placeholder="0.00">
+                            </div>
+                            <div class="mb-3">
+                                <label for="reteica" class="form-label fw-bold text-secondary">Retención ICA ($):</label>
+                                <input type="number" step="any" id="reteica" name="reteica" class="form-control text-end" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="d-flex justify-content-end gap-2 pt-3">
+                        <a href="{{ url_for('documentos') }}" class="btn btn-outline-secondary px-4">Cancelar</a>
+                        <button type="submit" class="btn btn-success px-4">Generar e Imprimir Documento</button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

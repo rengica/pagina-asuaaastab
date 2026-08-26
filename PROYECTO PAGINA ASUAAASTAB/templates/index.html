@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>ASUAAASTAB - Inicio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo ASUAAASTAB" class="logo">
+        </div>
+        <nav>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('documentos') }}">Generación de Documentos</a></li>
+                <li><a href="{{ url_for('contratacion') }}">Contratación</a></li>
+                <li><a href="{{ url_for('inventario') }}">Control de Inventario</a></li>
+                <li><a href="{{ url_for('pqrsf') }}">PQRSF</a></li>
+                <li><a href="{{ url_for('matriculas') }}">Matrículas</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+        <section class="bienvenida">
+            <h1>Bienvenido al portal institucional de ASUAAASTAB</h1>
+            <p>Gestión transparente y eficiente al servicio de nuestra comunidad.</p>
+        </section>
+
+        <section class="institucional">
+            <div class="tarjeta">
+                <h2>Nuestra Misión</h2>
+                <p>Proveer un servicio de acueducto confiable y de calidad, garantizando el acceso al agua potable con eficiencia, transparencia y responsabilidad ambiental.</p>
+            </div>
+            
+            <div class="tarjeta">
+                <h2>Nuestra Visión</h2>
+                <p>Consolidarnos como una organización modelo en la gestión de servicios públicos, destacando por nuestra sostenibilidad, innovación operativa y compromiso con el desarrollo social.</p>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
