@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Certificación de Servicios Públicos - {{ datos.nombre_usuario }}</title>
+    <style>
+        * { box-sizing: border-box; font-family: "Times New Roman", Times, serif; margin: 0; padding: 0; }
+        body { background-color: #f4f4f4; padding: 15px; color: #000; line-height: 1.45; font-size: 13.5px; }
+        
+        .page-container {
+            background: #fff;
+            width: 210mm;
+            max-height: 297mm;
+            margin: auto;
+            padding: 12mm 22mm 12mm 22mm;
+            position: relative;
+            border: 1px solid #ddd;
+            overflow: hidden;
+        }
+
+        /* Encabezado Superior */
+        .top-header { text-align: center; margin-bottom: 2px; }
+        .national-shield { width: 52px; height: auto; margin-bottom: 3px; }
+        .header-title-1 { font-size: 12px; font-weight: normal; text-transform: uppercase; }
+        .header-title-2 { font-size: 12px; font-weight: normal; text-transform: uppercase; }
+        .header-title-green { font-size: 12.5px; font-weight: bold; color: #008000; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .divider-line { border: none; border-top: 2px solid #000; margin: 4px 0 6px 0; }
+
+        .assoc-header { text-align: center; font-size: 10.5px; font-weight: bold; line-height: 1.25; text-transform: uppercase; }
+        .assoc-nit { text-align: center; font-size: 10.5px; font-weight: bold; margin-top: 2px; }
+        .assoc-vigilada { text-align: center; font-size: 10.5px; font-weight: bold; text-decoration: underline; margin-top: 3px; text-transform: uppercase; }
+
+        /* Texto de Certificación */
+        .cert-intro { text-align: center; font-size: 11px; font-weight: bold; margin: 16px 0 10px 0; line-height: 1.35; text-transform: uppercase; }
+        .cert-title { text-align: center; font-size: 15px; font-weight: bold; letter-spacing: 3px; margin: 12px 0 15px 0; text-transform: uppercase; }
+
+        /* Cuerpo del Documento */
+        .content { font-size: 13px; text-align: justify; line-height: 1.55; }
+        .content p { margin-bottom: 12px; text-indent: 0; }
+
+        .text-bold { font-weight: bold; }
+
+        /* Sección de Firma (Espaciado amplio para la firma manuscrita) */
+        .signature-section { margin-top: 85px; text-align: center; }
+        .signature-name { font-weight: bold; font-size: 13.5px; text-transform: uppercase; }
+        .signature-role { font-size: 12.5px; margin-top: 2px; }
+        .signature-org { font-size: 12.5px; font-weight: normal; }
+
+        /* Pie de Página Institucional */
+        .footer-container {
+            position: absolute;
+            bottom: 10mm;
+            left: 20mm;
+            right: 20mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        .footer-logo { width: 75px; height: auto; }
+        .footer-text { text-align: center; }
+        .footer-contact { font-weight: bold; font-style: italic; font-size: 12px; }
+        .footer-email { color: #0000ee; text-decoration: underline; font-style: italic; font-weight: bold; }
+        .footer-address { font-style: italic; color: #333; font-size: 11.5px; margin-top: 1px; }
+
+        /* Botones de navegación (No se imprimen) */
+        .no-print { margin-bottom: 15px; text-align: center; font-family: Arial, sans-serif; }
+        .btn { padding: 8px 16px; background: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 14px; font-family: Arial, sans-serif; }
+        .btn-sec { background: #6c757d; }
+
+        @media print {
+            @page {
+                size: letter portrait;
+                margin: 0;
+            }
+            body { background: white; padding: 0; }
+            .page-container { border: none; padding: 10mm 18mm 10mm 18mm; width: 100%; height: 100vh; max-height: 100vh; box-shadow: none; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn">🖨️ Imprimir Certificado</button>
+        <a href="{{ url_for('certificado_servicios') }}" class="btn btn-sec">Volver al Formulario</a>
+    </div>
+
+    <div class="page-container">
+        <!-- Encabezado Nacional y Municipal -->
+        <div class="top-header">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/e/ef/Coat_of_arms_of_Colombia.svg" class="national-shield" alt="Escudo de Colombia">
+            <div class="header-title-1">REPÚBLICA DE COLOMBIA</div>
+            <div class="header-title-2">DEPARTAMENTO DE NARIÑO</div>
+            <div class="header-title-green">MUNICIPIO DE EL TABLON DE GOMEZ</div>
+        </div>
+
+        <hr class="divider-line">
+
+        <!-- Encabezado Institucional ASUAAASTAB -->
+        <div class="assoc-header">
+            ASOCIACIÓN DE USUARIOS ADMINISTRADORA DE LOS SERVICIOS PUBLICOS DE ACUEDUCTO Y ALCANTARILLADO Y ASEO CASCO URBANO EL TABLÓN DE GOMEZ
+        </div>
+        <div class="assoc-nit">NIT: 900324139-0</div>
+        <div class="assoc-vigilada">"VIGILADA SUPERINTENDENCIA DE SERVICIOS PUBLICOS DOMICILIARIOS SSPD"</div>
+
+        <!-- Encabezado de Certificación -->
+        <div class="cert-intro">
+            EL(LA) SUSCRITO(A) {{ datos.cargo_firmante }} DE LA ASOCIACION DE USUARIOS ADMINISTRADORA DE LOS SERVICIOS PUBLICOS DOMICILIARIOS DE ACUEDUCTO ALCANTARILLADO Y ASEO, DEL CASCO URBANO DE EL TABLON DE GOMEZ "ASUAAASTAB"
+        </div>
+
+        <div class="cert-title">C E R T I F I C A :</div>
+
+        <!-- Contenido Principal con Gramática Dinámica -->
+        <div class="content">
+            <p>
+                {{ datos.trato_usuario }} <span class="text-bold">{{ datos.nombre_usuario }}</span>, {{ datos.identificado }} con cédula de ciudadanía No. <span class="text-bold">{{ datos.documento }}</span>, se encuentra {{ datos.matriculado }} y {{ datos.vinculado }} como {{ datos.usuario_word }} de los Servicios Públicos Domiciliarios de Acueducto, Alcantarillado y Aseo administrados por esta Asociación, correspondientes al predio ubicado en la <span class="text-bold">{{ datos.direccion_predio }}</span> del {{ datos.barrio }}, identificado con el código de usuario No. <span class="text-bold">{{ datos.codigo_usuario }}</span>.
+            </p>
+
+            <p>
+                A la fecha de expedición de la presente certificación, el inmueble cuenta con la prestación efectiva de los servicios públicos domiciliarios en condiciones de continuidad y calidad, encontrándose {{ datos.el_usuario }} en estado <span class="text-bold">{{ datos.estado_servicio }}</span> por concepto de facturación y administración de los mismos.
+            </p>
+
+            <p>
+                La presente certificación se expide a solicitud {{ datos.del_interesado }} para los fines que estime convenientes.
+            </p>
+
+            <p>
+                Se expide en el municipio de El Tablón de Gómez (Nariño), {{ datos.fecha_texto }}.
+            </p>
+        </div>
+
+        <!-- Firma -->
+        <div class="signature-section">
+            <div class="signature-name">{{ datos.nombre_firmante }}</div>
+            <div class="signature-role">{{ datos.cargo_firmante }}</div>
+            <div class="signature-org">ASUAAASTAB</div>
+        </div>
+
+        <!-- Pie de página -->
+        <div class="footer-container">
+            <div>
+                <img src="{{ url_for('static', filename='img/logo.png') }}" class="footer-logo" alt="ASUAAASTAB" onerror="this.style.display='none'">
+            </div>
+            <div class="footer-text">
+                <div class="footer-contact">
+                    CEL: 321 8796602-3146349592. E-mail: <span class="footer-email">asuaastab2015@outlook.com</span>
+                </div>
+                <div class="footer-address">
+                    Barrio San Francisco- casa de la cultura.
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
