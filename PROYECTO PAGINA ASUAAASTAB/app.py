@@ -744,4 +744,9 @@ if __name__ == '__main__':
     # Lee el puerto dinámico que asigna Render (o usa 5000 si ejecutas localmente)
     port = int(os.environ.get('PORT', 5000))
     # Enlaza a 0.0.0.0 para escuchar en la red pública del servidor
+    app.run(host='0.0.0.0', port=port) 
+    
+    # Lee el puerto dinámico que asigna Render (o usa 5000 si ejecutas localmente)
+    port = int(os.environ.get('PORT', 5000))
+    # Enlaza a 0.0.0.0 para escuchar en la red pública del servidor
     app.run(host='0.0.0.0', port=port)
