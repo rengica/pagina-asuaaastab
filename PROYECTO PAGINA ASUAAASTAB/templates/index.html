@@ -2,13 +2,17 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ASUAAASTAB - Inicio</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <header class="navbar">
         <div class="logo-container">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo ASUAAASTAB" class="logo">
+            <!-- LOGO ACTUALIZADO CON logo_asuaaastab.png -->
+            <a href="/">
+                <img src="{{ url_for('static', filename='logo_asuaaastab.png') }}" alt="Logo ASUAAASTAB" class="logo">
+            </a>
         </div>
         <nav>
             <ul class="nav-links">
@@ -17,6 +21,7 @@
                 <li><a href="{{ url_for('inventario') }}">Control de Inventario</a></li>
                 <li><a href="{{ url_for('pqrsf') }}">PQRSF</a></li>
                 <li><a href="{{ url_for('matriculas') }}">Matrículas</a></li>
+                <li><a href="{{ url_for('pagos_anticipados') }}" class="active-link">Pagos Anticipados</a></li>
             </ul>
         </nav>
     </header>
@@ -27,6 +32,7 @@
             <p>Gestión transparente y eficiente al servicio de nuestra comunidad.</p>
         </section>
 
+        <!-- SECCIÓN CENTRAL: SOLO MISIÓN Y VISIÓN -->
         <section class="institucional">
             <div class="tarjeta">
                 <h2>Nuestra Misión</h2>
