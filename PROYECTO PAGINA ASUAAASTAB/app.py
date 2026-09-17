@@ -6,7 +6,14 @@ from flask_sqlalchemy import SQLAlchemy
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_asuaaastab'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventario.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Obtener DATABASE_URL del servidor o usar SQLite local por defecto
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///inventario.db')
+
+# Corrección de compatibilidad para Render/Heroku (SQLAlchemy requiere 'postgresql://' en lugar de 'postgres://')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 
 # ===========================================================================
 # FILTRO DE MONEDA EN JINJA (COP)
@@ -741,11 +748,6 @@ def certificado_pago_anticipado(pago_id):
 import os
 
 if __name__ == '__main__':
-    # Lee el puerto dinámico que asigna Render (o usa 5000 si ejecutas localmente)
-    port = int(os.environ.get('PORT', 5000))
-    # Enlaza a 0.0.0.0 para escuchar en la red pública del servidor
-    app.run(host='0.0.0.0', port=port) 
-    
     # Lee el puerto dinámico que asigna Render (o usa 5000 si ejecutas localmente)
     port = int(os.environ.get('PORT', 5000))
     # Enlaza a 0.0.0.0 para escuchar en la red pública del servidor
