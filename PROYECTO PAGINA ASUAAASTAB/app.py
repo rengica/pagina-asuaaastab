@@ -178,9 +178,9 @@ class PagoAnticipado(db.Model):
     nombre_usuario = db.Column(db.String(120), nullable=False)
     documento = db.Column(db.String(20), nullable=False)
     codigo_usuario = db.Column(db.String(30), nullable=False)
-    direccion_predio = db.Column(db.String(200), nullable=False)
-    mes_inicio = db.Column(db.String(7), nullable=False)  # YYYY-MM
-    mes_final = db.Column(db.String(7), nullable=False)   # YYYY-MM
+    direccion_predio = db.Column(db.String(200), nullable=True)
+    mes_inicio = db.Column(db.String(7), nullable=False)   # YYYY-MM
+    mes_final = db.Column(db.String(7), nullable=False)    # YYYY-MM
     numero_meses = db.Column(db.Integer, nullable=False)
     meses_restantes = db.Column(db.Integer, nullable=False)
     valor_unitario = db.Column(db.Float, nullable=False)
