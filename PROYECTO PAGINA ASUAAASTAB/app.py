@@ -625,47 +625,21 @@ def reiniciar_consumido_mes():
 
 @app.route('/pagos-anticipados/guardar', methods=['POST'])
 def guardar_pago_anticipado():
-    nombre_usuario = request.form.get('nombre_usuario', '').strip()
-    documento = request.form.get('documento', '').strip()
-    codigo_usuario = request.form.get('codigo_usuario', '').strip()
-    direccion_predio = request.form.get('direccion_predio', '').strip()
-
-    mes_inicio = request.form.get('mes_inicio', datetime.now().strftime('%Y-%m'))
-    mes_final = request.form.get('mes_final', datetime.now().strftime('%Y-%m'))
-
-    numero_meses = calcular_meses_diferencia(mes_inicio, mes_final)
-
-    # Buscar el valor unitario en todos los nombres de campos posibles
-    raw_val_unitario = (
-        request.form.get('valor_unitario') or
-        request.form.get('valor_mes') or
-        request.form.get('tarifa') or
-        request.form.get('valor') or
-        request.form.get('valor_unitario_mes')
-    )
-
-    # Buscar el valor total en caso de que el formulario lo envie directamente
-    raw_val_total = (
-        request.form.get('valor_total') or
-        request.form.get('total') or
-        request.form.get('monto_total')
-    )
-
-    valor_unitario = limpiar_monto(raw_val_unitario)
-    valor_total = limpiar_monto(raw_val_total)
-
-    # Si se ingreso valor unitario pero no total, calcularlo
-    if valor_unitario > 0 and valor_total == 0:
-        valor_total = valor_unitario * numero_meses
-    # Si se ingreso valor total pero no unitario, calcularlo
-    elif valor_total > 0 and valor_unitario == 0 and numero_meses > 0:
-        valor_unitario = valor_total / numero_meses
-
+    nombre_usuario = request.form.get('nombre_usuario')
+    cedula = request.form.get('cedula')  # <--- 1. Capturar el valor del input 'cedula'
+    codigo_usuario = request.form.get('codigo_usuario')
+    
+    numero_meses = int(request.form.get('numero_meses') or 1)
+    mes_inicio = request.form.get('mes_inicio')
+    mes_final = request.form.get('mes_final')
+    valor_total = float(request.form.get('valor_total') or 0.0)
+    
+    valor_unitario = valor_total / numero_meses if numero_meses > 0 else 0.0
+    
     nuevo_pago = PagoAnticipado(
         nombre_usuario=nombre_usuario,
-        documento=documento,
+        cedula=cedula,                   # <--- 2. Pasarle la cédula al crear el registro
         codigo_usuario=codigo_usuario,
-        direccion_predio=direccion_predio,
         mes_inicio=mes_inicio,
         mes_final=mes_final,
         numero_meses=numero_meses,
@@ -674,9 +648,10 @@ def guardar_pago_anticipado():
         valor_total=valor_total,
         saldo_pendiente=valor_total
     )
+    
     db.session.add(nuevo_pago)
     db.session.commit()
-    flash('Pago anticipado registrado exitosamente.', 'exito')
+    flash('Pago anticipado registrado correctamente.', 'exito')
     return redirect(url_for('pagos_anticipados'))
 
 @app.route('/pagos-anticipados/descontar/<int:id>', methods=['POST'])
