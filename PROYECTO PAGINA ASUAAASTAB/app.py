@@ -626,20 +626,22 @@ def reiniciar_consumido_mes():
 @app.route('/pagos-anticipados/guardar', methods=['POST'])
 def guardar_pago_anticipado():
     nombre_usuario = request.form.get('nombre_usuario')
-    cedula = request.form.get('cedula')  # <--- 1. Capturar el valor del input 'cedula'
+    documento = request.form.get('cedula')  # Recibe del input name="cedula"
     codigo_usuario = request.form.get('codigo_usuario')
+    direccion_predio = request.form.get('direccion_predio', 'N/A')
     
     numero_meses = int(request.form.get('numero_meses') or 1)
     mes_inicio = request.form.get('mes_inicio')
-    mes_final = request.form.get('mes_final')
+    mes_final = request.form.get('mes_final') or mes_inicio
     valor_total = float(request.form.get('valor_total') or 0.0)
     
     valor_unitario = valor_total / numero_meses if numero_meses > 0 else 0.0
     
     nuevo_pago = PagoAnticipado(
         nombre_usuario=nombre_usuario,
-        cedula=cedula,                   # <--- 2. Pasarle la cédula al crear el registro
+        documento=documento,  # Se asigna correctamente al campo de la BD
         codigo_usuario=codigo_usuario,
+        direccion_predio=direccion_predio,
         mes_inicio=mes_inicio,
         mes_final=mes_final,
         numero_meses=numero_meses,
@@ -761,7 +763,7 @@ def editar_pago_anticipado(pago_id):
     pago = PagoAnticipado.query.get_or_404(pago_id)
     
     pago.nombre_usuario = request.form.get('nombre_usuario')
-    pago.cedula = request.form.get('cedula')
+    pago.documento = request.form.get('cedula')  # Se actualiza en la BD
     pago.codigo_usuario = request.form.get('codigo_usuario')
     
     numero_meses = int(request.form.get('numero_meses') or 1)
@@ -773,7 +775,6 @@ def editar_pago_anticipado(pago_id):
     pago.numero_meses = numero_meses
     pago.valor_total = valor_total
     
-    # Recalcular valor unitario y saldo pendiente
     if numero_meses > 0:
         pago.valor_unitario = valor_total / numero_meses
     else:
