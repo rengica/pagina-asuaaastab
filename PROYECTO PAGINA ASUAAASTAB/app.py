@@ -2,6 +2,9 @@ import os
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session 
 from flask_sqlalchemy import SQLAlchemy
+import io
+import pandas as pd
+from flask import send_file 
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_asuaaastab'
@@ -786,6 +789,42 @@ def editar_pago_anticipado(pago_id):
     db.session.commit()
     flash('Registro de pago anticipado actualizado correctamente.', 'exito')
     return redirect(url_for('pagos_anticipados'))
+@app.route('/pagos-anticipados/exportar-excel')
+def exportar_excel_pagos():
+    pagos = PagoAnticipado.query.all()
+    
+    datos = []
+    for p in pagos:
+        datos.append({
+            'Usuario': p.nombre_usuario,
+            'Cédula / Documento': p.documento,
+            'Código Predio': p.codigo_usuario,
+            'Dirección Predio': p.direccion_predio or 'N/A',
+            'Mes Inicio': p.mes_inicio,
+            'Mes Final': p.mes_final,
+            'Meses Cancelados': p.numero_meses,
+            'Meses Restantes': p.meses_restantes,
+            'Valor Unitario ($)': p.valor_unitario,
+            'Valor Total ($)': p.valor_total,
+            'Saldo Pendiente ($)': p.saldo_pendiente,
+            'Fecha Registro': p.fecha_registro.strftime('%Y-%m-%d %H:%M') if p.fecha_registro else ''
+        })
+    
+    # Crear DataFrame de pandas
+    df = pd.DataFrame(datos)
+    
+    # Generar el archivo Excel en memoria (sin guardar en disco)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Pagos Anticipados')
+    output.seek(0)
+    
+    return send_file(
+        output,
+        download_name='Pagos_Anticipados_ASUAAASTAB.xlsx',
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 # ARRANQUE DE LA APLICACIÓN
 # ===========================================================================
