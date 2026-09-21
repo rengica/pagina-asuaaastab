@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session 
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -585,7 +585,19 @@ def pagos_anticipados():
 
     total_recaudado = sum(p.valor_total for p in pagos)
     total_saldo_disponible = sum(p.saldo_pendiente for p in pagos)
-    total_aplicado = total_recaudado - total_saldo_disponible
+
+    # Detectar el mes actual (YYYY-MM)
+    mes_actual_str = datetime.now().strftime('%Y-%m')
+
+    # Si se puso en cero Total Consumido / Descontado para este mes
+    if session.get('consumido_cero') == mes_actual_str:
+        total_aplicado = 0.0
+        consumido_es_cero = True
+    else:
+        total_aplicado = total_recaudado - total_saldo_disponible
+        consumido_es_cero = False
+
+    # Cargo del mes actual (calculado normal)
     total_cargo_mes = sum(p.valor_unitario for p in pagos if p.saldo_pendiente > 0 and p.meses_restantes > 0)
 
     return render_template(
@@ -595,8 +607,21 @@ def pagos_anticipados():
         total_saldo_disponible=total_saldo_disponible,
         total_aplicado=total_aplicado,
         total_cargo_mes=total_cargo_mes,
-        mes_actual_default=datetime.now().strftime('%Y-%m')
+        consumido_es_cero=consumido_es_cero
     )
+
+@app.route('/pagos-anticipados/reiniciar-consumido', methods=['POST'])
+def reiniciar_consumido_mes():
+    mes_actual_str = datetime.now().strftime('%Y-%m')
+    
+    if session.get('consumido_cero') == mes_actual_str:
+        session.pop('consumido_cero', None)
+        flash('Se ha restablecido el Total Consumido / Descontado.', 'exito')
+    else:
+        session['consumido_cero'] = mes_actual_str
+        flash('El Total Consumido / Descontado se ha puesto en $ 0.', 'exito')
+        
+    return redirect(url_for('pagos_anticipados')) 
 
 @app.route('/pagos-anticipados/guardar', methods=['POST'])
 def guardar_pago_anticipado():
