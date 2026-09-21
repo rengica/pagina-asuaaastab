@@ -53,7 +53,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 1.5rem;
-            margin-bottom: 1.5rem; /* Ajustado para dar espacio al buscador */
+            margin-bottom: 1.5rem;
         }
 
         .stat-card {
@@ -163,6 +163,19 @@
             text-decoration: none;
         }
         .btn-icon-doc:hover { background-color: #dbeafe; transform: scale(1.05); }
+
+        .btn-editar {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            color: #0284c7;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            margin-right: 4px;
+        }
+        .btn-editar:hover { background: #e0f2fe; color: #0369a1; }
 
         .btn-eliminar {
             background: #fef2f2;
@@ -326,8 +339,21 @@
                                     📄 <span style="font-size: 0.75rem; margin-left: 4px; color: #0257b8; font-weight: bold;">Ver PDF</span>
                                 </a>
                             </td>
-                            <!-- BOTÓN ELIMINAR -->
-                            <td style="text-align: center;">
+                            <!-- BOTONES EDITAR Y ELIMINAR -->
+                            <td style="text-align: center; white-space: nowrap;">
+                                <button type="button" 
+                                        class="btn-editar" 
+                                        title="Editar Registro"
+                                        data-id="{{ p.id }}"
+                                        data-nombre="{{ p.nombre_usuario }}"
+                                        data-cedula="{{ p.cedula or '' }}"
+                                        data-codigo="{{ p.codigo_usuario }}"
+                                        data-num-meses="{{ p.numero_meses or 0 }}"
+                                        data-meses-rest="{{ p.meses_restantes or 0 }}"
+                                        data-mes-inicio="{{ p.mes_inicio or '' }}"
+                                        data-mes-final="{{ p.mes_final or '' }}"
+                                        data-valor-total="{{ p.valor_total or 0 }}"
+                                        onclick="prepararEdicion(this)">✏️</button>
                                 <form action="{{ url_for('eliminar_pago_anticipado', pago_id=p.id) }}" method="POST" onsubmit="return confirm('¿Está seguro de eliminar el registro de {{ p.nombre_usuario }}?');" style="display:inline;">
                                     <button type="submit" class="btn-eliminar" title="Eliminar Pago">🗑️</button>
                                 </form>
@@ -392,6 +418,56 @@
         </div>
     </div>
 
+    <!-- MODAL EDITAR PAGO -->
+    <div id="modalEditar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar Pago Anticipado</h2>
+                <button class="close-btn" onclick="cerrarModal('modalEditar')">&times;</button>
+            </div>
+            <form id="edit_form" action="" method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Nombre del Usuario:</label>
+                        <input type="text" id="edit_nombre_usuario" name="nombre_usuario" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Cédula:</label>
+                        <input type="text" id="edit_cedula" name="cedula" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Cód. Predio / Usuario:</label>
+                        <input type="text" id="edit_codigo_usuario" name="codigo_usuario" required>
+                    </div>
+                    <div class="form-group">
+                        <label>N° Meses Cancelados:</label>
+                        <input type="number" min="1" id="edit_numero_meses" name="numero_meses" required>
+                    </div>
+                    <div class="form-group">
+                        <label>N° Meses Restantes:</label>
+                        <input type="number" min="0" id="edit_meses_restantes" name="meses_restantes" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Inicio:</label>
+                        <input type="month" id="edit_mes_inicio" name="mes_inicio" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha Fin (Opcional):</label>
+                        <input type="month" id="edit_mes_final" name="mes_final">
+                    </div>
+                    <div class="form-group-full form-group">
+                        <label>Valor Total Cancelado ($):</label>
+                        <input type="number" step="0.01" id="edit_valor_total" name="valor_total" required>
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn-guardar" style="background-color: #0056b3;">Guardar Cambios</button>
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal('modalEditar')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL CARGAR MES -->
     <div id="modalCargar" class="modal">
         <div class="modal-content">
@@ -425,6 +501,22 @@
     <script>
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
         function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // Cargar datos en la modal de edición
+        function prepararEdicion(btn) {
+            let dataset = btn.dataset;
+            document.getElementById('edit_form').action = "/pagos-anticipados/editar/" + dataset.id;
+            document.getElementById('edit_nombre_usuario').value = dataset.nombre;
+            document.getElementById('edit_cedula').value = dataset.cedula;
+            document.getElementById('edit_codigo_usuario').value = dataset.codigo;
+            document.getElementById('edit_numero_meses').value = dataset.numMeses;
+            document.getElementById('edit_meses_restantes').value = dataset.mesesRest;
+            document.getElementById('edit_mes_inicio').value = dataset.mesInicio;
+            document.getElementById('edit_mes_final').value = dataset.mesFinal;
+            document.getElementById('edit_valor_total').value = dataset.valorTotal;
+            
+            abrirModal('modalEditar');
+        }
 
         // Función de Búsqueda
         function filtrarPagos() {
