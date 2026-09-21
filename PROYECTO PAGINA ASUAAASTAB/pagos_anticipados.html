@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASUAAASTAB - Pagos Anticipados</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .dashboard-container {
+            padding: 1rem 0;
+            max-width: 1250px;
+            margin: 0 auto;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            color: #0d47a1;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .header-actions { display: flex; gap: 10px; }
+
+        .btn-accion {
+            padding: 10px 18px;
+            border-radius: 6px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.3s ease;
+        }
+
+        .btn-primario { background-color: #0056b3; color: white; }
+        .btn-primario:hover { background-color: #003d82; }
+
+        .btn-secundario { background-color: #2e7d32; color: white; }
+        .btn-secundario:hover { background-color: #1b5e20; }
+
+        /* ESTADÍSTICAS */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem; /* Ajustado para dar espacio al buscador */
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid #2196f3;
+        }
+
+        .stat-card.recaudado { border-left-color: #0288d1; background: linear-gradient(135deg, #ffffff 80%, #e1f5fe 100%); }
+        .stat-card.disponible { border-left-color: #2e7d32; background: linear-gradient(135deg, #ffffff 80%, #e8f5e9 100%); }
+        .stat-card.aplicado { border-left-color: #ed6c02; background: linear-gradient(135deg, #ffffff 80%, #fff3e0 100%); }
+        .stat-card.cargo { border-left-color: #9c27b0; background: linear-gradient(135deg, #ffffff 80%, #f3e5f5 100%); }
+
+        .stat-card h3 { font-size: 0.85rem; text-transform: uppercase; color: #555; margin: 0 0 0.5rem 0; }
+        .stat-card .value { font-size: 1.7rem; font-weight: 800; color: #1e293b; margin: 0; }
+        .stat-card.disponible .value { color: #2e7d32; }
+
+        /* BOTÓN REINICIAR CONSUMIDO */
+        .btn-cargo-action {
+            padding: 5px 12px;
+            font-size: 0.78rem;
+            border-radius: 20px;
+            border: 1px solid;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .btn-zero {
+            background-color: #fff3e0;
+            border-color: #ffcc80;
+            color: #e65100;
+        }
+        .btn-zero:hover {
+            background-color: #ffe0b2;
+        }
+        .btn-restablecer {
+            background-color: #e8f5e9;
+            border-color: #a5d6a7;
+            color: #2e7d32;
+        }
+        .btn-restablecer:hover {
+            background-color: #c8e6c9;
+        }
+
+        /* BUSCADOR */
+        .search-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 1rem;
+        }
+        
+        .search-input {
+            width: 100%;
+            max-width: 350px;
+            padding: 10px 15px 10px 35px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%2394a3b8" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>') no-repeat 10px center;
+            transition: all 0.2s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #0257b8;
+            box-shadow: 0 0 0 3px rgba(2, 87, 184, 0.1);
+        }
+
+        /* TABLA DE REGISTROS */
+        .table-card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .custom-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .custom-table thead { background-color: #0257b8; color: #ffffff; }
+        .custom-table th { padding: 1rem 0.8rem; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+        .custom-table td { padding: 0.8rem 0.8rem; border-bottom: 1px solid #f1f5f9; font-size: 0.88rem; color: #334155; vertical-align: middle; }
+        .custom-table tbody tr:hover { background-color: #f8fafc; }
+
+        .badge-months {
+            background-color: #e2e8f0;
+            color: #1e293b;
+            padding: 0.3rem 0.6rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.82rem;
+        }
+        .text-success { color: #2e7d32; font-weight: bold; }
+        .text-danger { color: #d32f2f; font-weight: bold; }
+
+        /* BOTONES DE TABLA */
+        .btn-icon-doc {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .btn-icon-doc:hover { background-color: #dbeafe; transform: scale(1.05); }
+
+        .btn-eliminar {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        .btn-eliminar:hover { background: #fee2e2; color: #991b1b; }
+
+        /* MODALES */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 550px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 { margin: 0; color: #0056b3; font-size: 1.3rem; }
+        .close-btn { cursor: pointer; font-size: 1.5rem; color: #888; border: none; background: none; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group-full { grid-column: span 2; }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo-container">
+            <a href="/">
+                <img src="{{ url_for('static', filename='logo_asuaaastab.png') }}" alt="Logo ASUAAASTAB" class="logo">
+            </a>
+        </div>
+        <nav>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('documentos') }}">Generación de Documentos</a></li>
+                <li><a href="{{ url_for('contratacion') }}">Contratación</a></li>
+                <li><a href="{{ url_for('inventario') }}">Control de Inventario</a></li>
+                <li><a href="{{ url_for('pqrsf') }}">PQRSF</a></li>
+                <li><a href="{{ url_for('matriculas') }}">Matrículas</a></li>
+                <li><a href="{{ url_for('pagos_anticipados') }}" class="active-link">Pagos Anticipados</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="dashboard-container">
+            <div class="page-header">
+                <h1 class="page-title">Gestión de Pagos Anticipados</h1>
+                <div class="header-actions">
+                    <button class="btn-accion btn-primario" onclick="abrirModal('modalPago')">+ Registrar Pago</button>
+                    <button class="btn-accion btn-secundario" onclick="abrirModal('modalCargar')">⚡ Cargar Mes</button>
+                </div>
+            </div>
+
+            <!-- TARJETAS DE ESTADÍSTICAS -->
+            <div class="stats-grid">
+                <div class="stat-card recaudado">
+                    <h3>Total Recaudado Inicial</h3>
+                    <p class="value">$ {{ "{:,.0f}".format(total_recaudado or 0).replace(',', '.') }}</p>
+                </div>
+                <div class="stat-card disponible">
+                    <h3>Saldo Disponible (Por Aplicar)</h3>
+                    <p class="value">$ {{ "{:,.0f}".format(total_saldo_disponible or 0).replace(',', '.') }}</p>
+                </div>
+
+                <!-- TOTAL CONSUMIDO / DESCONTADO -->
+                <div class="stat-card aplicado">
+                    <h3>Total Consumido / Descontado</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                        <p class="value" style="margin: 0;">$ {{ "{:,.0f}".format(total_aplicado or 0).replace(',', '.') }}</p>
+                        <form action="{{ url_for('reiniciar_consumido_mes') }}" method="POST" style="margin: 0;">
+                            {% if consumido_es_cero %}
+                                <button type="submit" class="btn-cargo-action btn-restablecer" title="Reactivar valor consumido">
+                                    🔄 Restablecer
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn-cargo-action btn-zero" title="Poner en $ 0 para este mes">
+                                    🧹 Poner en $0
+                                </button>
+                            {% endif %}
+                        </form>
+                    </div>
+                </div>
+
+                <!-- CARGO DEL MES ACTUAL -->
+                <div class="stat-card cargo">
+                    <h3>Cargo del Mes Actual</h3>
+                    <p class="value">$ {{ "{:,.0f}".format(total_cargo_mes or 0).replace(',', '.') }}</p>
+                </div>
+            </div>
+
+            <!-- BUSCADOR -->
+            <div class="search-container">
+                <input type="text" id="buscadorTabla" class="search-input" placeholder="Buscar por Nombre, Cédula o Cód. Predio..." onkeyup="filtrarPagos()">
+            </div>
+
+            <!-- TABLA PRINCIPAL -->
+            <div class="table-card">
+                <table class="custom-table" id="tablaPagos">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Cédula</th>
+                            <th>Cód. Predio</th>
+                            <th>Periodo</th>
+                            <th>N° Meses</th>
+                            <th>Meses Rest.</th>
+                            <th>V. Unitario</th>
+                            <th>V. Total</th>
+                            <th>Saldo Pend.</th>
+                            <th style="text-align: center;">Certificado</th>
+                            <th style="text-align: center;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pagos %}
+                        <tr class="fila-pago">
+                            <td class="col-usuario"><strong>{{ p.nombre_usuario }}</strong></td>
+                            <td class="col-cedula">{{ p.cedula or 'N/A' }}</td>
+                            <td class="col-predio"><code>{{ p.codigo_usuario }}</code></td>
+                            <td>{{ p.mes_inicio }} {% if p.mes_final %}a {{ p.mes_final }}{% endif %}</td>
+                            <td>{{ p.numero_meses or 0 }}</td>
+                            <td>
+                                <span class="badge-months">
+                                    {{ p.meses_restantes or 0 }} / {{ p.numero_meses or 0 }}
+                                </span>
+                            </td>
+                            <td>$ {{ "{:,.0f}".format(p.valor_unitario or 0).replace(',', '.') }}</td>
+                            <td>$ {{ "{:,.0f}".format(p.valor_total or 0).replace(',', '.') }}</td>
+                            <td>
+                                <span class="{{ 'text-success' if (p.saldo_pendiente or 0) > 0 else 'text-danger' }}">
+                                    $ {{ "{:,.0f}".format(p.saldo_pendiente or 0).replace(',', '.') }}
+                                </span>
+                            </td>
+                            <!-- BOTÓN DESCARGA CERTIFICADO -->
+                            <td style="text-align: center;">
+                                <a href="{{ url_for('certificado_pago_anticipado', pago_id=p.id) }}" target="_blank" class="btn-icon-doc" title="Generar Certificado">
+                                    📄 <span style="font-size: 0.75rem; margin-left: 4px; color: #0257b8; font-weight: bold;">Ver PDF</span>
+                                </a>
+                            </td>
+                            <!-- BOTÓN ELIMINAR -->
+                            <td style="text-align: center;">
+                                <form action="{{ url_for('eliminar_pago_anticipado', pago_id=p.id) }}" method="POST" onsubmit="return confirm('¿Está seguro de eliminar el registro de {{ p.nombre_usuario }}?');" style="display:inline;">
+                                    <button type="submit" class="btn-eliminar" title="Eliminar Pago">🗑️</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="11" style="text-align: center; color: #64748b; padding: 2rem;">
+                                No hay registros de pagos anticipados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL REGISTRAR PAGO -->
+    <div id="modalPago" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Añadir Pago Anticipado</h2>
+                <button class="close-btn" onclick="cerrarModal('modalPago')">&times;</button>
+            </div>
+            <form action="{{ url_for('guardar_pago_anticipado') }}" method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Nombre del Usuario:</label>
+                        <input type="text" name="nombre_usuario" required placeholder="Ej. Camila">
+                    </div>
+                    <div class="form-group">
+                        <label>Cédula:</label>
+                        <input type="text" name="cedula" required placeholder="Ej. 1085123456">
+                    </div>
+                    <div class="form-group">
+                        <label>Cód. Predio / Usuario:</label>
+                        <input type="text" name="codigo_usuario" required placeholder="Ej. 520001">
+                    </div>
+                    <div class="form-group">
+                        <label>N° Meses Cancelados:</label>
+                        <input type="number" min="1" name="numero_meses" required placeholder="Ej. 5">
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Inicio:</label>
+                        <input type="month" name="mes_inicio" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha Fin (Opcional):</label>
+                        <input type="month" name="mes_final">
+                    </div>
+                    <div class="form-group-full form-group">
+                        <label>Valor Total Cancelado ($):</label>
+                        <input type="number" step="0.01" name="valor_total" required placeholder="Ej. 57500">
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn-guardar">Guardar Pago</button>
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal('modalPago')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CARGAR MES -->
+    <div id="modalCargar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cargar Descuento Mensual</h2>
+                <button class="close-btn" onclick="cerrarModal('modalCargar')">&times;</button>
+            </div>
+            <form action="{{ url_for('cargar_mes_anticipado') }}" method="POST">
+                <div class="form-group">
+                    <label>Seleccionar Destinatario:</label>
+                    <select name="target_usuario" required>
+                        <option value="TODOS">-- Todos los Usuarios con Saldo --</option>
+                        {% for p in pagos %}
+                            {% if (p.meses_restantes or 0) > 0 %}
+                                <option value="{{ p.id }}">{{ p.nombre_usuario }} (Cód: {{ p.codigo_usuario }})</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <p style="font-size: 0.85rem; color: #555;">
+                    Al procesar el cargo, se descontará 1 mes al periodo restante y se reducirá el saldo pendiente correspondientemente.
+                </p>
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn-guardar" style="background-color: #2e7d32;">Procesar Cargo</button>
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal('modalCargar')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // Función de Búsqueda
+        function filtrarPagos() {
+            let input = document.getElementById("buscadorTabla").value.toLowerCase();
+            let filas = document.getElementsByClassName("fila-pago");
+
+            for (let i = 0; i < filas.length; i++) {
+                let colUsuario = filas[i].querySelector(".col-usuario").innerText.toLowerCase();
+                let colCedula = filas[i].querySelector(".col-cedula").innerText.toLowerCase();
+                let colPredio = filas[i].querySelector(".col-predio").innerText.toLowerCase();
+
+                if (colUsuario.includes(input) || colCedula.includes(input) || colPredio.includes(input)) {
+                    filas[i].style.display = "";
+                } else {
+                    filas[i].style.display = "none";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
