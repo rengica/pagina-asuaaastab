@@ -53,7 +53,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 1.5rem;
-            margin-bottom: 2.5rem;
+            margin-bottom: 1.5rem; /* Ajustado para dar espacio al buscador */
         }
 
         .stat-card {
@@ -72,6 +72,57 @@
         .stat-card h3 { font-size: 0.85rem; text-transform: uppercase; color: #555; margin: 0 0 0.5rem 0; }
         .stat-card .value { font-size: 1.7rem; font-weight: 800; color: #1e293b; margin: 0; }
         .stat-card.disponible .value { color: #2e7d32; }
+
+        /* BOTÓN REINICIAR CONSUMIDO */
+        .btn-cargo-action {
+            padding: 5px 12px;
+            font-size: 0.78rem;
+            border-radius: 20px;
+            border: 1px solid;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .btn-zero {
+            background-color: #fff3e0;
+            border-color: #ffcc80;
+            color: #e65100;
+        }
+        .btn-zero:hover {
+            background-color: #ffe0b2;
+        }
+        .btn-restablecer {
+            background-color: #e8f5e9;
+            border-color: #a5d6a7;
+            color: #2e7d32;
+        }
+        .btn-restablecer:hover {
+            background-color: #c8e6c9;
+        }
+
+        /* BUSCADOR */
+        .search-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 1rem;
+        }
+        
+        .search-input {
+            width: 100%;
+            max-width: 350px;
+            padding: 10px 15px 10px 35px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%2394a3b8" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>') no-repeat 10px center;
+            transition: all 0.2s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #0257b8;
+            box-shadow: 0 0 0 3px rgba(2, 87, 184, 0.1);
+        }
 
         /* TABLA DE REGISTROS */
         .table-card {
@@ -199,19 +250,41 @@
                     <h3>Saldo Disponible (Por Aplicar)</h3>
                     <p class="value">$ {{ "{:,.0f}".format(total_saldo_disponible or 0).replace(',', '.') }}</p>
                 </div>
+
+                <!-- TOTAL CONSUMIDO / DESCONTADO -->
                 <div class="stat-card aplicado">
                     <h3>Total Consumido / Descontado</h3>
-                    <p class="value">$ {{ "{:,.0f}".format(total_aplicado or 0).replace(',', '.') }}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                        <p class="value" style="margin: 0;">$ {{ "{:,.0f}".format(total_aplicado or 0).replace(',', '.') }}</p>
+                        <form action="{{ url_for('reiniciar_consumido_mes') }}" method="POST" style="margin: 0;">
+                            {% if consumido_es_cero %}
+                                <button type="submit" class="btn-cargo-action btn-restablecer" title="Reactivar valor consumido">
+                                    🔄 Restablecer
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn-cargo-action btn-zero" title="Poner en $ 0 para este mes">
+                                    🧹 Poner en $0
+                                </button>
+                            {% endif %}
+                        </form>
+                    </div>
                 </div>
+
+                <!-- CARGO DEL MES ACTUAL -->
                 <div class="stat-card cargo">
                     <h3>Cargo del Mes Actual</h3>
                     <p class="value">$ {{ "{:,.0f}".format(total_cargo_mes or 0).replace(',', '.') }}</p>
                 </div>
             </div>
 
+            <!-- BUSCADOR -->
+            <div class="search-container">
+                <input type="text" id="buscadorTabla" class="search-input" placeholder="Buscar por Nombre, Cédula o Cód. Predio..." onkeyup="filtrarPagos()">
+            </div>
+
             <!-- TABLA PRINCIPAL -->
             <div class="table-card">
-                <table class="custom-table">
+                <table class="custom-table" id="tablaPagos">
                     <thead>
                         <tr>
                             <th>Usuario</th>
@@ -229,10 +302,10 @@
                     </thead>
                     <tbody>
                         {% for p in pagos %}
-                        <tr>
-                            <td><strong>{{ p.nombre_usuario }}</strong></td>
-                            <td>{{ p.cedula or 'N/A' }}</td>
-                            <td><code>{{ p.codigo_usuario }}</code></td>
+                        <tr class="fila-pago">
+                            <td class="col-usuario"><strong>{{ p.nombre_usuario }}</strong></td>
+                            <td class="col-cedula">{{ p.cedula or 'N/A' }}</td>
+                            <td class="col-predio"><code>{{ p.codigo_usuario }}</code></td>
                             <td>{{ p.mes_inicio }} {% if p.mes_final %}a {{ p.mes_final }}{% endif %}</td>
                             <td>{{ p.numero_meses or 0 }}</td>
                             <td>
@@ -352,6 +425,24 @@
     <script>
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
         function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // Función de Búsqueda
+        function filtrarPagos() {
+            let input = document.getElementById("buscadorTabla").value.toLowerCase();
+            let filas = document.getElementsByClassName("fila-pago");
+
+            for (let i = 0; i < filas.length; i++) {
+                let colUsuario = filas[i].querySelector(".col-usuario").innerText.toLowerCase();
+                let colCedula = filas[i].querySelector(".col-cedula").innerText.toLowerCase();
+                let colPredio = filas[i].querySelector(".col-predio").innerText.toLowerCase();
+
+                if (colUsuario.includes(input) || colCedula.includes(input) || colPredio.includes(input)) {
+                    filas[i].style.display = "";
+                } else {
+                    filas[i].style.display = "none";
+                }
+            }
+        }
     </script>
 </body>
 </html>
