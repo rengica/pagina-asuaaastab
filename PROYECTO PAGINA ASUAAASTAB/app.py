@@ -781,6 +781,35 @@ def certificado_pago_anticipado(pago_id):
         mes_actual=MESES[hoy.month - 1],
         ano_actual=hoy.year
     )
+@app.route('/pagos-anticipados/editar/<int:pago_id>', methods=['POST'])
+def editar_pago_anticipado(pago_id):
+    pago = PagoAnticipado.query.get_or_404(pago_id)
+    
+    pago.nombre_usuario = request.form.get('nombre_usuario')
+    pago.cedula = request.form.get('cedula')
+    pago.codigo_usuario = request.form.get('codigo_usuario')
+    
+    numero_meses = int(request.form.get('numero_meses') or 1)
+    valor_total = float(request.form.get('valor_total') or 0.0)
+    meses_restantes = int(request.form.get('meses_restantes') or numero_meses)
+    
+    pago.mes_inicio = request.form.get('mes_inicio')
+    pago.mes_final = request.form.get('mes_final')
+    pago.numero_meses = numero_meses
+    pago.valor_total = valor_total
+    
+    # Recalcular valor unitario y saldo pendiente
+    if numero_meses > 0:
+        pago.valor_unitario = valor_total / numero_meses
+    else:
+        pago.valor_unitario = 0.0
+        
+    pago.meses_restantes = meses_restantes
+    pago.saldo_pendiente = pago.valor_unitario * meses_restantes
+    
+    db.session.commit()
+    flash('Registro de pago anticipado actualizado correctamente.', 'exito')
+    return redirect(url_for('pagos_anticipados'))
 
 # ARRANQUE DE LA APLICACIÓN
 # ===========================================================================
