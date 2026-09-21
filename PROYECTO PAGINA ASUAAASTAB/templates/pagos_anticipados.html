@@ -236,6 +236,10 @@
             <div class="page-header">
                 <h1 class="page-title">Gestión de Pagos Anticipados</h1>
                 <div class="header-actions">
+                    <a href="{{ url_for('exportar_excel_pagos') }}" class="btn-accion btn-excel" title="Descargar archivo Excel">
+        📊 Exportar a Excel
+    </a>
+
                     <button class="btn-accion btn-primario" onclick="abrirModal('modalPago')">+ Registrar Pago</button>
                     <button class="btn-accion btn-secundario" onclick="abrirModal('modalCargar')">⚡ Cargar Mes</button>
                 </div>
