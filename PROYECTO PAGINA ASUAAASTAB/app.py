@@ -579,30 +579,18 @@ def certificado_servicios():
 # ===========================================================================
 # MÓDULO DE PAGOS ANTICIPADOS
 # ===========================================================================
-@app.route('/pagos-anticipados', methods=['GET', 'POST'])
+@app.route('/pagos-anticipados')
 def pagos_anticipados():
-    if request.method == 'POST':
-        return guardar_pago_anticipado()
-
-    pagos = PagoAnticipado.query.order_by(PagoAnticipado.id.desc()).all()
-
-    total_recaudado = sum(p.valor_total for p in pagos)
-    total_saldo_disponible = sum(p.saldo_pendiente for p in pagos)
-
-    # Detectar el mes actual (YYYY-MM)
-    mes_actual_str = datetime.now().strftime('%Y-%m')
-
-    # Si se puso en cero Total Consumido / Descontado para este mes
-    if session.get('consumido_cero') == mes_actual_str:
-        total_aplicado = 0.0
-        consumido_es_cero = True
-    else:
-        total_aplicado = total_recaudado - total_saldo_disponible
-        consumido_es_cero = False
-
-    # Cargo del mes actual (calculado normal)
-    total_cargo_mes = sum(p.valor_unitario for p in pagos if p.saldo_pendiente > 0 and p.meses_restantes > 0)
-
+    pagos = PagoAnticipado.query.all()
+    
+    total_recaudado = sum(p.valor_total or 0.0 for p in pagos)
+    total_saldo_disponible = sum(p.saldo_pendiente or 0.0 for p in pagos)
+    total_aplicado = total_recaudado - total_saldo_disponible
+    
+    # Leemos el cargo del mes procesado guardado en la sesión
+    total_cargo_mes = session.get('total_cargo_mes', 0.0)
+    consumido_es_cero = (total_cargo_mes == 0.0)
+    
     return render_template(
         'pagos_anticipados.html',
         pagos=pagos,
@@ -612,17 +600,15 @@ def pagos_anticipados():
         total_cargo_mes=total_cargo_mes,
         consumido_es_cero=consumido_es_cero
     )
-
 @app.route('/pagos-anticipados/reiniciar-consumido', methods=['POST'])
 def reiniciar_consumido_mes():
-    mes_actual_str = datetime.now().strftime('%Y-%m')
-    
-    if session.get('consumido_cero') == mes_actual_str:
-        session.pop('consumido_cero', None)
-        flash('Se ha restablecido el Total Consumido / Descontado.', 'exito')
+    # Si actualmente está en 0, lo reestablecemos calculando lo consumido
+    if session.get('total_cargo_mes', 0.0) == 0.0:
+        # Recalcular el último cargo o limpiar la sesión
+        session.pop('total_cargo_mes', None)
     else:
-        session['consumido_cero'] = mes_actual_str
-        flash('El Total Consumido / Descontado se ha puesto en $ 0.', 'exito')
+        # Poner en 0.0
+        session['total_cargo_mes'] = 0.0
         
     return redirect(url_for('pagos_anticipados')) 
 
@@ -672,67 +658,31 @@ def descontar_pago_anticipado(id):
 
 @app.route('/pagos-anticipados/cargar-mes', methods=['POST'])
 def cargar_mes_anticipado():
-    # Detecta el valor enviado desde el select del modal
-    target = (
-        request.form.get('target_usuario', '') or 
-        request.form.get('pago_id', '') or 
-        request.form.get('codigo_usuario', '')
-    ).strip()
-
-    if not target:
-        flash('No se seleccionó ningún usuario o parámetro válido.', 'error')
-        return redirect(url_for('pagos_anticipados'))
-
-    # OPCIÓN 1: Cargar cobro a TODOS los usuarios activos
-    if target.upper() == "TODOS":
-        pagos = PagoAnticipado.query.filter(
-            PagoAnticipado.meses_restantes > 0, 
-            PagoAnticipado.saldo_pendiente > 0
-        ).all()
-        
-        if not pagos:
-            flash('No hay usuarios con pagos pendientes por aplicar.', 'advertencia')
-            return redirect(url_for('pagos_anticipados'))
-
-        count = 0
-        for pago in pagos:
-            pago.saldo_pendiente -= pago.valor_unitario
-            if pago.saldo_pendiente < 0:
-                pago.saldo_pendiente = 0.0
-            pago.meses_restantes -= 1
-            count += 1
-
-        db.session.commit()
-        flash(f'Se aplicó el cobro del mes a {count} usuario(s) con saldo activo.', 'exito')
-        return redirect(url_for('pagos_anticipados'))
-
-    # OPCIÓN 2: Cargar cobro a UN SOLO usuario
-    pago = None
+    target = request.form.get('target_usuario')
     
-    # 1. Intentar buscar por ID (si el select envía el ID numérico del registro)
-    if target.isdigit():
-        pago = PagoAnticipado.query.get(int(target))
-
-    # 2. Si no lo encuentra por ID, buscar por código de usuario con meses activos
-    if not pago:
-        pago = PagoAnticipado.query.filter(
-            PagoAnticipado.codigo_usuario == target,
-            PagoAnticipado.meses_restantes > 0,
-            PagoAnticipado.saldo_pendiente > 0
-        ).first()
-
-    # 3. Aplicar el descuento si existe y tiene saldo
-    if pago and pago.meses_restantes > 0 and pago.saldo_pendiente > 0:
-        pago.saldo_pendiente -= pago.valor_unitario
-        if pago.saldo_pendiente < 0:
-            pago.saldo_pendiente = 0.0
-        pago.meses_restantes -= 1
-        
-        db.session.commit()
-        flash(f'Se cargó el mes correctamente para: {pago.nombre_usuario}.', 'exito')
+    # Seleccionamos usuarios que tengan al menos 1 mes restante
+    if target == 'TODOS':
+        pagos = PagoAnticipado.query.filter(PagoAnticipado.meses_restantes > 0).all()
     else:
-        flash('No se encontró un pago activo para la selección realizada o el usuario ya no tiene meses pendientes.', 'error')
+        pagos = PagoAnticipado.query.filter(PagoAnticipado.id == int(target), PagoAnticipado.meses_restantes > 0).all()
+    
+    cargo_procesado_este_mes = 0.0
+    
+    for p in pagos:
+        if p.meses_restantes > 0:
+            # PASO CLAVE: Primero sumamos el valor que se le cobró ESTE MES
+            # (Incluso si le quedaba 1 mes y pasa a 0, este valor SÍ se suma al cargo del mes)
+            cargo_procesado_este_mes += p.valor_unitario
+            
+            # Luego descontamos el mes y recalculamos el saldo pendiente
+            p.meses_restantes -= 1
+            p.saldo_pendiente = p.valor_unitario * p.meses_restantes
 
+    # Acumulamos en la sesión el cargo realizado este mes
+    session['total_cargo_mes'] = session.get('total_cargo_mes', 0.0) + cargo_procesado_este_mes
+    
+    db.session.commit()
+    flash('Cargo mensual procesado correctamente.', 'exito')
     return redirect(url_for('pagos_anticipados'))
 
 @app.route('/pagos-anticipados/eliminar/<int:pago_id>', methods=['POST'])
