@@ -8,29 +8,24 @@ from flask import send_file
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_asuaaastab'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventario.db'
+
 # Obtener DATABASE_URL del servidor o usar SQLite local por defecto
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///inventario.db')
 
-# Corrección de compatibilidad para Render/Heroku (SQLAlchemy requiere 'postgresql://' en lugar de 'postgres://')
+# Corrección de compatibilidad para Render: forzar el driver psycopg2
 if database_url and database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    database_url = database_url.replace('postgres://', 'postgresql+psycopg2://', 1)
 
+# Configuración de SQLAlchemy
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-# Configuración de la base de datos
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///inventario.db')
-
-if database_url and database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-
-# AGREGAR AQUÍ:
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,
 }
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Inicialización de la base de datos
+db = SQLAlchemy(app)
 
 # ===========================================================================
 # FILTRO DE MONEDA EN JINJA (COP)
