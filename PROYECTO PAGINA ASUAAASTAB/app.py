@@ -1,10 +1,19 @@
+import io
 import os
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, session 
-from flask_sqlalchemy import SQLAlchemy
-import io
+
 import pandas as pd
-from flask import send_file 
+from flask import (
+    Flask,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_asuaaastab'
@@ -40,8 +49,6 @@ def cop_filter(val):
 
 app.jinja_env.filters['cop'] = cop_filter
 
-db = SQLAlchemy(app)
-
 # ===========================================================================
 # AUXILIARES, MONEDA Y MANEJO DE CONSECUTIVOS
 # ===========================================================================
@@ -61,15 +68,12 @@ def limpiar_monto(val):
     if not val_str:
         return 0.0
 
-    # Quitar signo de pesos y espacios
     val_str = val_str.replace('$', '').replace(' ', '')
 
-    # Manejar separadores de miles y decimales en formato colombiano/latino
     if '.' in val_str and ',' in val_str:
         val_str = val_str.replace('.', '').replace(',', '.')
     elif '.' in val_str:
         parts = val_str.split('.')
-        # Si las partes despues del punto tienen 3 digitos, es separador de miles
         if len(parts) > 1 and all(len(p) == 3 for p in parts[1:]):
             val_str = "".join(parts)
     elif ',' in val_str:
@@ -200,6 +204,25 @@ class PagoAnticipado(db.Model):
             return f"{inicio_str} – {fin_str}"
         except Exception:
             return f"{self.mes_inicio} a {self.mes_final}"
+
+# MODELO PARA GUARDAR VALORES GLOBALES (COMO EL CARGO DEL MES EN LA BASE DE DATOS)
+class Configuracion(db.Model):
+    __tablename__ = 'configuracion'
+    clave = db.Column(db.String(50), primary_key=True)
+    valor = db.Column(db.Float, default=0.0)
+
+def obtener_cargo_mes_db():
+    conf = Configuracion.query.get('total_cargo_mes')
+    return conf.valor if conf else 0.0
+
+def guardar_cargo_mes_db(nuevo_valor):
+    conf = Configuracion.query.get('total_cargo_mes')
+    if not conf:
+        conf = Configuracion(clave='total_cargo_mes', valor=nuevo_valor)
+        db.session.add(conf)
+    else:
+        conf.valor = nuevo_valor
+    db.session.commit()
 
 with app.app_context():
     db.create_all()
@@ -582,8 +605,8 @@ def pagos_anticipados():
     total_saldo_disponible = sum(p.saldo_pendiente or 0.0 for p in pagos)
     total_aplicado = total_recaudado - total_saldo_disponible
     
-    # Leemos el cargo del mes procesado guardado en la sesión
-    total_cargo_mes = session.get('total_cargo_mes', 0.0)
+    # AHORA SE LEE DIRECTO DE LA BASE DE DATOS (ACCESIBLE PARA TODOS LOS EQUIPOS)
+    total_cargo_mes = obtener_cargo_mes_db()
     consumido_es_cero = (total_cargo_mes == 0.0)
     
     return render_template(
@@ -595,22 +618,17 @@ def pagos_anticipados():
         total_cargo_mes=total_cargo_mes,
         consumido_es_cero=consumido_es_cero
     )
+
 @app.route('/pagos-anticipados/reiniciar-consumido', methods=['POST'])
 def reiniciar_consumido_mes():
-    # Si actualmente está en 0, lo reestablecemos calculando lo consumido
-    if session.get('total_cargo_mes', 0.0) == 0.0:
-        # Recalcular el último cargo o limpiar la sesión
-        session.pop('total_cargo_mes', None)
-    else:
-        # Poner en 0.0
-        session['total_cargo_mes'] = 0.0
-        
+    # REINICIA EL VALOR EN LA BASE DE DATOS
+    guardar_cargo_mes_db(0.0)
     return redirect(url_for('pagos_anticipados')) 
 
 @app.route('/pagos-anticipados/guardar', methods=['POST'])
 def guardar_pago_anticipado():
     nombre_usuario = request.form.get('nombre_usuario')
-    documento = request.form.get('cedula')  # Recibe del input name="cedula"
+    documento = request.form.get('cedula')
     codigo_usuario = request.form.get('codigo_usuario')
     direccion_predio = request.form.get('direccion_predio', 'N/A')
     
@@ -623,7 +641,7 @@ def guardar_pago_anticipado():
     
     nuevo_pago = PagoAnticipado(
         nombre_usuario=nombre_usuario,
-        documento=documento,  # Se asigna correctamente al campo de la BD
+        documento=documento,
         codigo_usuario=codigo_usuario,
         direccion_predio=direccion_predio,
         mes_inicio=mes_inicio,
@@ -655,7 +673,6 @@ def descontar_pago_anticipado(id):
 def cargar_mes_anticipado():
     target = request.form.get('target_usuario')
     
-    # Seleccionamos usuarios que tengan al menos 1 mes restante
     if target == 'TODOS':
         pagos = PagoAnticipado.query.filter(PagoAnticipado.meses_restantes > 0).all()
     else:
@@ -665,16 +682,13 @@ def cargar_mes_anticipado():
     
     for p in pagos:
         if p.meses_restantes > 0:
-            # PASO CLAVE: Primero sumamos el valor que se le cobró ESTE MES
-            # (Incluso si le quedaba 1 mes y pasa a 0, este valor SÍ se suma al cargo del mes)
             cargo_procesado_este_mes += p.valor_unitario
-            
-            # Luego descontamos el mes y recalculamos el saldo pendiente
             p.meses_restantes -= 1
             p.saldo_pendiente = p.valor_unitario * p.meses_restantes
 
-    # Acumulamos en la sesión el cargo realizado este mes
-    session['total_cargo_mes'] = session.get('total_cargo_mes', 0.0) + cargo_procesado_este_mes
+    # AHORA SE SUMA Y SE GUARDA DIRECTAMENTE EN LA BASE DE DATOS
+    cargo_actual_db = obtener_cargo_mes_db()
+    guardar_cargo_mes_db(cargo_actual_db + cargo_procesado_este_mes)
     
     db.session.commit()
     flash('Cargo mensual procesado correctamente.', 'exito')
@@ -691,27 +705,22 @@ def eliminar_pago_anticipado(pago_id):
 @app.route('/pagos-anticipados/certificado/<int:pago_id>')
 def certificado_pago_anticipado(pago_id):
     pago = PagoAnticipado.query.get_or_404(pago_id)
-    
-    MESES = [
-        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-    ]
-    
     hoy = datetime.now()
 
     return render_template(
-        'certificado_pago_anticipado_print.html',  # O el nombre de tu plantilla HTML
+        'certificado_pago_anticipado_print.html',
         pago=pago,
         dia_actual=hoy.day,
         mes_actual=MESES[hoy.month - 1],
         ano_actual=hoy.year
     )
+
 @app.route('/pagos-anticipados/editar/<int:pago_id>', methods=['POST'])
 def editar_pago_anticipado(pago_id):
     pago = PagoAnticipado.query.get_or_404(pago_id)
     
     pago.nombre_usuario = request.form.get('nombre_usuario')
-    pago.documento = request.form.get('cedula')  # Se actualiza en la BD
+    pago.documento = request.form.get('cedula')
     pago.codigo_usuario = request.form.get('codigo_usuario')
     
     numero_meses = int(request.form.get('numero_meses') or 1)
@@ -734,6 +743,7 @@ def editar_pago_anticipado(pago_id):
     db.session.commit()
     flash('Registro de pago anticipado actualizado correctamente.', 'exito')
     return redirect(url_for('pagos_anticipados'))
+
 @app.route('/pagos-anticipados/exportar-excel')
 def exportar_excel_pagos():
     pagos = PagoAnticipado.query.all()
@@ -755,10 +765,8 @@ def exportar_excel_pagos():
             'Fecha Registro': p.fecha_registro.strftime('%Y-%m-%d %H:%M') if p.fecha_registro else ''
         })
     
-    # Crear DataFrame de pandas
     df = pd.DataFrame(datos)
     
-    # Generar el archivo Excel en memoria (sin guardar en disco)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Pagos Anticipados')
@@ -771,12 +779,9 @@ def exportar_excel_pagos():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
+# ===========================================================================
 # ARRANQUE DE LA APLICACIÓN
 # ===========================================================================
-import os
-
 if __name__ == '__main__':
-    # Lee el puerto dinámico que asigna Render (o usa 5000 si ejecutas localmente)
     port = int(os.environ.get('PORT', 5000))
-    # Enlaza a 0.0.0.0 para escuchar en la red pública del servidor
     app.run(host='0.0.0.0', port=port)
