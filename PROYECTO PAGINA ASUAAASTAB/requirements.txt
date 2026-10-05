@@ -4,3 +4,5 @@ psycopg2-binary
 gunicorn
 pandas
 openpyxl
+psycopg2-binary
+psycopg 
