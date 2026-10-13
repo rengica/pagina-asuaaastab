@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASUAAASTAB - Gestión de Matrículas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .dashboard-container {
+            padding: 1rem 0;
+            max-width: 1250px;
+            margin: 0 auto;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            color: #0d47a1;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .header-actions { display: flex; gap: 10px; }
+
+        .btn-accion {
+            padding: 10px 18px;
+            border-radius: 6px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.3s ease;
+        }
+
+        .btn-primario { background-color: #0056b3; color: white; }
+        .btn-primario:hover { background-color: #003d82; }
+
+        /* ESTADÍSTICAS */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid #2196f3;
+        }
+
+        .stat-card.total { border-left-color: #0288d1; background: linear-gradient(135deg, #ffffff 80%, #e1f5fe 100%); }
+        .stat-card.activos { border-left-color: #2e7d32; background: linear-gradient(135deg, #ffffff 80%, #e8f5e9 100%); }
+        .stat-card.inactivos { border-left-color: #ed6c02; background: linear-gradient(135deg, #ffffff 80%, #fff3e0 100%); }
+        .stat-card.suspendidos { border-left-color: #d32f2f; background: linear-gradient(135deg, #ffffff 80%, #ffebee 100%); }
+
+        .stat-card h3 { font-size: 0.85rem; text-transform: uppercase; color: #555; margin: 0 0 0.5rem 0; }
+        .stat-card .value { font-size: 1.7rem; font-weight: 800; color: #1e293b; margin: 0; }
+
+        /* BUSCADOR */
+        .search-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 1rem;
+        }
+        
+        .search-input {
+            width: 100%;
+            max-width: 350px;
+            padding: 10px 15px 10px 35px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%2394a3b8" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>') no-repeat 10px center;
+            transition: all 0.2s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #0257b8;
+            box-shadow: 0 0 0 3px rgba(2, 87, 184, 0.1);
+        }
+
+        /* TABLA DE REGISTROS */
+        .table-card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .custom-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .custom-table thead { background-color: #0257b8; color: #ffffff; }
+        .custom-table th { padding: 1rem 0.8rem; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+        .custom-table td { padding: 0.8rem 0.8rem; border-bottom: 1px solid #f1f5f9; font-size: 0.88rem; color: #334155; vertical-align: middle; }
+        .custom-table tbody tr:hover { background-color: #f8fafc; }
+
+        /* SELECT ESTADO Y BADGES */
+        .select-estado {
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+            outline: none;
+        }
+        .select-estado.ACTIVO { background-color: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+        .select-estado.INACTIVO { background-color: #fff3e0; color: #e65100; border-color: #ffcc80; }
+        .select-estado.SUSPENDIDO { background-color: #ffebee; color: #c62828; border-color: #ef9a9a; }
+
+        /* BOTONES DE ADJUNTOS Y ACCIONES */
+        .btn-icon-doc {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: #1e40af;
+            font-weight: 600;
+            margin: 2px 0;
+        }
+        .btn-icon-doc:hover { background-color: #dbeafe; transform: scale(1.03); }
+
+        .btn-editar {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            color: #0284c7;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            margin-right: 4px;
+        }
+        .btn-editar:hover { background: #e0f2fe; color: #0369a1; }
+
+        .btn-eliminar {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        .btn-eliminar:hover { background: #fee2e2; color: #991b1b; }
+
+        /* MODALES */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 { margin: 0; color: #0056b3; font-size: 1.3rem; }
+        .close-btn { cursor: pointer; font-size: 1.5rem; color: #888; border: none; background: none; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group-full { grid-column: span 2; }
+        
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #475569;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-guardar {
+            background-color: #0056b3;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-cancelar {
+            background-color: #64748b;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo-container">
+            <a href="/">
+                <img src="{{ url_for('static', filename='logo_asuaaastab.png') }}" alt="Logo ASUAAASTAB" class="logo">
+            </a>
+        </div>
+        <nav>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('documentos') }}">Generación de Documentos</a></li>
+                <li><a href="{{ url_for('contratacion') }}">Contratación</a></li>
+                <li><a href="{{ url_for('inventario') }}">Control de Inventario</a></li>
+                <li><a href="{{ url_for('pqrsf') }}">PQRSF</a></li>
+                <li><a href="{{ url_for('matriculas') }}" class="active-link">Matrículas</a></li>
+                <li><a href="{{ url_for('pagos_anticipados') }}">Pagos Anticipados</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="dashboard-container">
+            <div class="page-header">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <a href="/" class="btn-accion" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;">← Volver a inicio</a>
+                    <h1 class="page-title">Gestión de Matrículas</h1>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-accion btn-primario" onclick="abrirModal('modalMatricula')">+ Registrar Matrícula</button>
+                </div>
+            </div>
+
+            <!-- TARJETAS DE ESTADÍSTICAS -->
+            <div class="stats-grid">
+                <div class="stat-card total">
+                    <h3>Total Usuarios</h3>
+                    <p class="value">{{ total_usuarios or 0 }}</p>
+                </div>
+                <div class="stat-card activos">
+                    <h3>Usuarios Activos</h3>
+                    <p class="value" style="color: #2e7d32;">{{ total_activos or 0 }}</p>
+                </div>
+                <div class="stat-card inactivos">
+                    <h3>Usuarios Inactivos</h3>
+                    <p class="value" style="color: #ed6c02;">{{ total_inactivos or 0 }}</p>
+                </div>
+                <div class="stat-card suspendidos">
+                    <h3>Usuarios Suspendidos</h3>
+                    <p class="value" style="color: #c62828;">{{ total_suspendidos or 0 }}</p>
+                </div>
+            </div>
+
+            <!-- BUSCADOR -->
+            <div class="search-container">
+                <input type="text" id="buscadorTabla" class="search-input" placeholder="Buscar por Nombre, Cédula o Cód. Predio..." onkeyup="filtrarTabla()">
+            </div>
+
+            <!-- TABLA PRINCIPAL -->
+            <div class="table-card">
+                <table class="custom-table" id="tablaMatriculas">
+                    <thead>
+                        <tr>
+                            <th>Cód. Predio</th>
+                            <th>Nombre Usuario</th>
+                            <th>Cédula</th>
+                            <th>Fecha Compra</th>
+                            <th>Estado</th>
+                            <th>Adjuntos</th>
+                            <th>Notas / Observaciones</th>
+                            <th style="text-align: center;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in usuarios %}
+                        <tr class="fila-usuario">
+                            <td class="col-codigo"><code>{{ u.codigo }}</code></td>
+                            <td class="col-nombre"><strong>{{ u.nombre }}</strong></td>
+                            <td class="col-cedula">{{ u.cedula or 'N/A' }}</td>
+                            <td>{{ u.fecha_compra or 'Sin fecha' }}</td>
+                            <td>
+                                <form action="{{ url_for('cambiar_estado_matricula', user_id=u.id) }}" method="POST" style="margin: 0;">
+                                    <select name="estado_matricula" class="select-estado {{ u.estado_matricula }}" onchange="this.form.submit()">
+                                        <option value="ACTIVO" {% if u.estado_matricula == 'ACTIVO' %}selected{% endif %}>ACTIVO</option>
+                                        <option value="INACTIVO" {% if u.estado_matricula == 'INACTIVO' %}selected{% endif %}>INACTIVO</option>
+                                        <option value="SUSPENDIDO" {% if u.estado_matricula == 'SUSPENDIDO' %}selected{% endif %}>SUSPENDIDO</option>
+                                    </select>
+                                </form>
+                            </td>
+                            <td>
+                                {% if u.documento_adjunto %}
+                                    <a href="{{ url_for('static', filename='uploads/' ~ u.documento_adjunto) }}" target="_blank" class="btn-icon-doc" title="Ver Documento">📄 Documento</a>
+                                {% endif %}
+                                {% if u.foto_ubicacion %}
+                                    <a href="{{ url_for('static', filename='uploads/' ~ u.foto_ubicacion) }}" target="_blank" class="btn-icon-doc" title="Ver Foto Ubicación">🖼️ Foto</a>
+                                {% endif %}
+                                {% if not u.documento_adjunto and not u.foto_ubicacion %}
+                                    <span style="color: #94a3b8; font-size: 0.8rem;">Ninguno</span>
+                                {% endif %}
+                            </td>
+                            <td style="max-width: 200px; font-size: 0.82rem; color: #64748b;">{{ u.nota or '-' }}</td>
+                            <td style="text-align: center; white-space: nowrap;">
+                                <button type="button" 
+                                        class="btn-editar" 
+                                        title="Editar Registro"
+                                        data-id="{{ u.id }}"
+                                        data-codigo="{{ u.codigo }}"
+                                        data-nombre="{{ u.nombre }}"
+                                        data-cedula="{{ u.cedula or '' }}"
+                                        data-estado="{{ u.estado_matricula }}"
+                                        data-fecha="{{ u.fecha_compra or '' }}"
+                                        data-nota="{{ u.nota or '' }}"
+                                        onclick="prepararEdicion(this)">✏️</button>
+                                
+                                <form action="{{ url_for('eliminar_matricula', user_id=u.id) }}" method="POST" onsubmit="return confirm('¿Está seguro de eliminar la matrícula del usuario {{ u.nombre }}?');" style="display:inline;">
+                                    <button type="submit" class="btn-eliminar" title="Eliminar Matrícula">🗑️</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: #64748b; padding: 2rem;">
+                                No hay usuarios matriculados registrados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL REGISTRAR MATRÍCULA -->
+    <div id="modalMatricula" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Registrar Nueva Matrícula</h2>
+                <button class="close-btn" onclick="cerrarModal('modalMatricula')">&times;</button>
+            </div>
+            <form action="{{ url_for('guardar_matricula') }}" method="POST" enctype="multipart/form-data">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Cód. Predio / Usuario:</label>
+                        <input type="text" name="codigo" required placeholder="Ej. 520001">
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Completo:</label>
+                        <input type="text" name="nombre" required placeholder="Ej. Juan Pérez">
+                    </div>
+                    <div class="form-group">
+                        <label>Cédula / Documento:</label>
+                        <input type="text" name="cedula" placeholder="Ej. 1085123456">
+                    </div>
+                    <div class="form-group">
+                        <label>Estado Inicial:</label>
+                        <select name="estado_matricula">
+                            <option value="ACTIVO" selected>ACTIVO</option>
+                            <option value="INACTIVO">INACTIVO</option>
+                            <option value="SUSPENDIDO">SUSPENDIDO</option>
+                        </select>
+                    </div>
+                    <div class="form-group form-group-full">
+                        <label>Fecha de Compra / Registro:</label>
+                        <input type="date" name="fecha_compra" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Documento Adjunto (PDF/Imagen):</label>
+                        <input type="file" name="documento_adjunto">
+                    </div>
+                    <div class="form-group">
+                        <label>Foto Ubicación (Imagen):</label>
+                        <input type="file" name="foto_ubicacion">
+                    </div>
+                    <div class="form-group-full form-group">
+                        <label>Notas / Observaciones:</label>
+                        <textarea name="nota" rows="2" placeholder="Detalles o notas adicionales..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn-guardar">Guardar Matrícula</button>
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal('modalMatricula')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR MATRÍCULA -->
+    <div id="modalEditar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar Matrícula</h2>
+                <button class="close-btn" onclick="cerrarModal('modalEditar')">&times;</button>
+            </div>
+            <form id="edit_form" action="" method="POST" enctype="multipart/form-data">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Cód. Predio / Usuario:</label>
+                        <input type="text" id="edit_codigo" disabled style="background-color: #f1f5f9;">
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Completo:</label>
+                        <input type="text" id="edit_nombre" name="nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Cédula / Documento:</label>
+                        <input type="text" id="edit_cedula" name="cedula">
+                    </div>
+                    <div class="form-group">
+                        <label>Estado:</label>
+                        <select id="edit_estado" name="estado_matricula">
+                            <option value="ACTIVO">ACTIVO</option>
+                            <option value="INACTIVO">INACTIVO</option>
+                            <option value="SUSPENDIDO">SUSPENDIDO</option>
+                        </select>
+                    </div>
+                    <div class="form-group form-group-full">
+                        <label>Fecha de Compra:</label>
+                        <input type="date" id="edit_fecha" name="fecha_compra">
+                    </div>
+                    <div class="form-group">
+                        <label>Cambiar Documento Adjunto:</label>
+                        <input type="file" name="documento_adjunto">
+                    </div>
+                    <div class="form-group">
+                        <label>Cambiar Foto Ubicación:</label>
+                        <input type="file" name="foto_ubicacion">
+                    </div>
+                    <div class="form-group-full form-group">
+                        <label>Notas / Observaciones:</label>
+                        <textarea id="edit_nota" name="nota" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn-guardar">Guardar Cambios</button>
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal('modalEditar')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // Cargar datos en la modal de edición
+        function prepararEdicion(btn) {
+            let dataset = btn.dataset;
+            document.getElementById('edit_form').action = "/matriculas/editar/" + dataset.id;
+            document.getElementById('edit_codigo').value = dataset.codigo;
+            document.getElementById('edit_nombre').value = dataset.nombre;
+            document.getElementById('edit_cedula').value = dataset.cedula;
+            document.getElementById('edit_estado').value = dataset.estado;
+            document.getElementById('edit_fecha').value = dataset.fecha;
+            document.getElementById('edit_nota').value = dataset.nota;
+            
+            abrirModal('modalEditar');
+        }
+
+        // Búsqueda en tiempo real
+        function filtrarTabla() {
+            let input = document.getElementById("buscadorTabla").value.toLowerCase();
+            let filas = document.getElementsByClassName("fila-usuario");
+
+            for (let i = 0; i < filas.length; i++) {
+                let colCodigo = filas[i].querySelector(".col-codigo").innerText.toLowerCase();
+                let colNombre = filas[i].querySelector(".col-nombre").innerText.toLowerCase();
+                let colCedula = filas[i].querySelector(".col-cedula").innerText.toLowerCase();
+
+                if (colCodigo.includes(input) || colNombre.includes(input) || colCedula.includes(input)) {
+                    filas[i].style.display = "";
+                } else {
+                    filas[i].style.display = "none";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
