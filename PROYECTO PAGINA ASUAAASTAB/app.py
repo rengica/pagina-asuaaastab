@@ -1,6 +1,6 @@
 import io
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
 import pandas as pd
@@ -254,9 +254,6 @@ def inicio():
 def contratacion():
     return "<h1>Módulo de Contratación</h1><p>En construcción...</p>"
 
-@app.route('/pqrsf')
-def pqrsf():
-    return "<h1>Módulo de PQRSF</h1><p>En construcción...</p>"
 
 # -------------------------------------------------------------------------
 # 5. MÓDULO DE MATRÍCULAS
@@ -951,7 +948,165 @@ def certificado_servicios():
         return render_template('certificado_servicios_print.html', datos=datos)
 
     return render_template('certificado_servicios_form.html', datetime=datetime.now().strftime('%Y-%m-%d'))
+# ---------------------------------------------------------------------------
+# MODELO BASE DE DATOS PARA PQRSF
+# ---------------------------------------------------------------------------
+class PQRSF(db.Model):
+    __tablename__ = 'pqrsf'
+    id = db.Column(db.Integer, primary_key=True)
+    radicado = db.Column(db.String(30), unique=True, nullable=False)
+    tipo = db.Column(db.String(30), nullable=False)
+    
+    # Datos del Solicitante
+    documento = db.Column(db.String(20), nullable=False)
+    nombre = db.Column(db.String(120), nullable=False)
+    correo = db.Column(db.String(120), nullable=False)
+    telefono = db.Column(db.String(20), nullable=False)
+    direccion = db.Column(db.String(150))
+    sector = db.Column(db.String(100))
+    
+    # Detalle y Adjuntos de la Solicitud
+    asunto = db.Column(db.String(200), nullable=False)
+    descripcion = db.Column(db.Text, nullable=False)
+    archivo_adjunto = db.Column(db.String(255)) # Nombre del archivo soporte subido por el usuario
+    
+    # Tiempos y Control
+    fecha_radicacion = db.Column(db.DateTime, default=datetime.now)
+    fecha_limite = db.Column(db.DateTime) # Calculada a 5 días hábiles
+    
+    # Estado y Respuesta Administrativa
+    estado = db.Column(db.String(30), default='Recibido') # Recibido, En Gestión, Resuelto, Rechazado
+    respuesta = db.Column(db.Text)
+    funcionario_responsable = db.Column(db.String(100))
+    fecha_respuesta = db.Column(db.DateTime)
+# ---------------------------------------------------------------------------
+# RUTAS DE PQRSF
+# ---------------------------------------------------------------------------
 
+# 1. VISTA PRINCIPAL PQRSF
+@app.route('/pqrsf')
+def pqrsf():
+    solicitudes = PQRSF.query.order_by(PQRSF.fecha_radicacion.desc()).all()
+    return render_template('pqrsf.html', solicitudes=solicitudes)
+
+# 2. RADICAR NUEVA PQRSF (PÚBLICO)
+# 1. RADICAR NUEVA PQRSF (Con adjunto y fecha límite de 5 días hábiles)
+# ===========================================================================
+# FUNCIONES AUXILIARES DE PQRSF
+# ===========================================================================
+def calcular_dias_habiles(fecha_inicio, dias=5):
+    fecha_actual = fecha_inicio
+    dias_sumados = 0
+    while dias_sumados < dias:
+        fecha_actual += timedelta(days=1)
+        # 0: Lunes, 1: Martes, ..., 4: Viernes, 5: Sábado, 6: Domingo
+        if fecha_actual.weekday() < 5:
+            dias_sumados += 1
+    return fecha_actual
+
+@app.route('/pqrsf/radicar', methods=['POST'])
+def radicar_pqrsf():
+    tipo = request.form.get('tipo')
+    documento = request.form.get('documento')
+    nombre = request.form.get('nombre')
+    correo = request.form.get('correo')
+    telefono = request.form.get('telefono')
+    direccion = request.form.get('direccion')
+    sector = request.form.get('sector')
+    asunto = request.form.get('asunto')
+    descripcion = request.form.get('descripcion')
+
+    # Manejo del archivo adjunto subido por el usuario
+    archivo = request.files.get('archivo_soporte')
+    nombre_archivo = None
+    if archivo and archivo.filename != '':
+        filename = secure_filename(archivo.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+        nombre_archivo = timestamp + filename
+        archivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo))
+
+    # Consecutivo y radicado
+    consecutivo = PQRSF.query.count() + 1
+    numero_radicado = f"PQRSF-{datetime.now().year}-{consecutivo:04d}"
+
+    # Cálculo de los 5 días hábiles
+    fecha_actual = datetime.now()
+    fecha_limite = calcular_dias_habiles(fecha_actual, dias=5)
+
+    nueva_pqrsf = PQRSF(
+        radicado=numero_radicado,
+        tipo=tipo,
+        documento=documento,
+        nombre=nombre,
+        correo=correo,
+        telefono=telefono,
+        direccion=direccion,
+        sector=sector,
+        asunto=asunto,
+        descripcion=descripcion,
+        archivo_adjunto=nombre_archivo,
+        fecha_radicacion=fecha_actual,
+        fecha_limite=fecha_limite
+    )
+
+    db.session.add(nueva_pqrsf)
+    db.session.commit()
+
+    flash(f'Su solicitud ha sido radicada. Número de Radicado: {numero_radicado}. Fecha límite de respuesta: {fecha_limite.strftime("%Y-%m-%d")}', 'success')
+    return redirect(url_for('pqrsf'))
+
+
+# 2. GENERAR Y DESCARGAR RESPUESTA OFICIAL DE LA PQRSF EN DOCUMENTO HTML/PRINTABLE
+@app.route('/pqrsf/descargar-respuesta/<int:pqrsf_id>')
+def descargar_respuesta_pqrsf(pqrsf_id):
+    solicitud = PQRSF.query.get_or_404(pqrsf_id)
+    return render_template('formato_respuesta_pqrsf.html', s=solicitud, fecha_actual=datetime.now())
+
+# 3. GESTIONAR / RESPONDER PQRSF (ADMINISTRATIVO)
+@app.route('/pqrsf/responder/<int:pqrsf_id>', methods=['POST'])
+def responder_pqrsf(pqrsf_id):
+    solicitud = PQRSF.query.get_or_404(pqrsf_id)
+    solicitud.estado = request.form.get('estado')
+    solicitud.respuesta = request.form.get('respuesta')
+    solicitud.funcionario_responsable = request.form.get('funcionario_responsable')
+    solicitud.fecha_respuesta = datetime.now()
+
+    db.session.commit()
+    flash(f'La solicitud {solicitud.radicado} ha sido actualizada.', 'success')
+    return redirect(url_for('pqrsf'))
+
+# 4. EXPORTAR REPORTE PQRSF A EXCEL
+@app.route('/pqrsf/exportar-excel')
+def exportar_pqrsf_excel():
+    solicitudes = PQRSF.query.all()
+    
+    datos = []
+    for s in solicitudes:
+        datos.append({
+            'N° Radicado': s.radicado,
+            'Tipo': s.tipo,
+            'Fecha Radicación': s.fecha_radicacion.strftime('%Y-%m-%d %H:%M') if s.fecha_radicacion else '',
+            'Documento': s.documento,
+            'Nombre Solicitante': s.nombre,
+            'Correo': s.correo,
+            'Teléfono': s.telefono,
+            'Dirección / Sector': f"{s.direccion or ''} - {s.sector or ''}",
+            'Asunto': s.asunto,
+            'Descripción': s.descripcion,
+            'Estado': s.estado,
+            'Respuesta Oficial': s.respuesta or 'Pendiente',
+            'Funcionario Responsable': s.funcionario_responsable or 'Sin asignar',
+            'Fecha Respuesta': s.fecha_respuesta.strftime('%Y-%m-%d %H:%M') if s.fecha_respuesta else ''
+        })
+    
+    df = pd.DataFrame(datos)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Reporte_PQRSF')
+    output.seek(0)
+    
+    filename = f"Reporte_PQRSF_ASUAAASTAB_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 # -------------------------------------------------------------------------
 # 9. ARRANQUE DE LA APLICACIÓN
 # -------------------------------------------------------------------------
