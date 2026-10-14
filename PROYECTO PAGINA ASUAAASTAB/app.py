@@ -2,17 +2,27 @@ import io
 import os
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
-from dotenv import load_dotenv
-load_dotenv()  # Carga la variable DATABASE_URL del archivo .env automáticamente
+
+# Carga la variable DATABASE_URL del archivo .env automáticamente solo en entorno local
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 import pandas as pd
-from flask import (Flask,flash,redirect,render_template,request,send_file,
+from flask import (
+    Flask,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
     send_from_directory,
     session,
     url_for,
 )
-from flask_sqlalchemy import SQLAlchemy
-
+from flask_sqlalchemy import SQLAlchemy 
 # -------------------------------------------------------------------------
 # 1. INICIALIZACIÓN Y CONFIGURACIÓN DE FLASK & SQLALCHEMY
 # -------------------------------------------------------------------------
