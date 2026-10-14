@@ -47,3 +47,56 @@
     </main>
 </body>
 </html>
+<!-- GALERÍA ROTATIVA DE DOS IMÁGENES -->
+<div class="galeria-container">
+    <div class="galeria-card">
+        <img id="imgIzquierda" src="{{ url_for('static', filename='img1.jpg') }}" alt="Imagen Institucional 1">
+    </div>
+    <div class="galeria-card">
+        <img id="imgDerecha" src="{{ url_for('static', filename='img2.jpg') }}" alt="Imagen Institucional 2">
+    </div>
+</div>
+<!-- Aquí termina el contenido de la página (Misión, Visión y Galería) -->
+        </div>
+    </main>
+
+    <!-- PEGAR AQUÍ EL CÓDIGO SCRIPT -->
+    <script>
+        // Listado de nombres de tus imágenes guardadas en la carpeta static/
+        const imagenes = [
+            "{{ url_for('static', filename='img1.jpg') }}",
+            "{{ url_for('static', filename='img2.jpg') }}",
+            "{{ url_for('static', filename='img3.jpg') }}",
+            "{{ url_for('static', filename='img4.jpg') }}"
+        ];
+
+        let indiceActual = 0;
+
+        function cambiarImagenes() {
+            const imgIzquierda = document.getElementById("imgIzquierda");
+            const imgDerecha = document.getElementById("imgDerecha");
+
+            // 1. Efecto de desvanecimiento
+            imgIzquierda.classList.add("fade-out");
+            imgDerecha.classList.add("fade-out");
+
+            setTimeout(() => {
+                // 2. Avanzar el índice de imágenes
+                indiceActual = (indiceActual + 2) % imagenes.length;
+                let indiceDerecho = (indiceActual + 1) % imagenes.length;
+
+                // 3. Cambiar las rutas de origen
+                imgIzquierda.src = imagenes[indiceActual];
+                imgDerecha.src = imagenes[indiceDerecho];
+
+                // 4. Mostrar de nuevo las imágenes
+                imgIzquierda.classList.remove("fade-out");
+                imgDerecha.classList.remove("fade-out");
+            }, 800); // Tiempo alineado con la transición CSS
+        }
+
+        // Cambia las imágenes cada 5000 ms (5 segundos)
+        setInterval(cambiarImagenes, 5000);
+    </script>
+</body>
+</html>

@@ -234,11 +234,14 @@
     <main class="container">
         <div class="dashboard-container">
             <div class="page-header">
-                <h1 class="page-title">Gestión de Pagos Anticipados</h1>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <a href="{{ url_for('inicio') }}" class="btn-accion" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;">← Volver a inicio</a>
+                    <h1 class="page-title">Gestión de Pagos Anticipados</h1>
+                </div>
                 <div class="header-actions">
                     <a href="{{ url_for('exportar_excel_pagos') }}" class="btn-accion btn-excel" title="Descargar archivo Excel">
-        📊 Exportar a Excel
-    </a>
+                        📊 Exportar a Excel
+                    </a>
 
                     <button class="btn-accion btn-primario" onclick="abrirModal('modalPago')">+ Registrar Pago</button>
                     <button class="btn-accion btn-secundario" onclick="abrirModal('modalCargar')">⚡ Cargar Mes</button>
@@ -301,7 +304,6 @@
                         {% for p in pagos %}
                         <tr class="fila-pago">
                             <td class="col-usuario"><strong>{{ p.nombre_usuario }}</strong></td>
-                            <!-- CAMBIO CLAVE: Leer p.documento en lugar de p.cedula -->
                             <td class="col-cedula">{{ p.documento or 'N/A' }}</td>
                             <td class="col-predio"><code>{{ p.codigo_usuario }}</code></td>
                             <td>{{ p.mes_inicio }} {% if p.mes_final %}a {{ p.mes_final }}{% endif %}</td>
