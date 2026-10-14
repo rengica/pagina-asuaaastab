@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASUAAASTAB - Módulo PQRSF</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .dashboard-container { padding: 1rem 0; max-width: 1300px; margin: 0 auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .page-title { color: #0d47a1; font-size: 1.8rem; font-weight: 700; margin: 0; }
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+        .btn-accion { padding: 10px 18px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primario { background-color: #0056b3; color: white; }
+        .btn-primario:hover { background-color: #003d82; }
+        .btn-excel { background-color: #107c41; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+
+        /* BADGES Y ALERTAS DE FECHA LÍMITE */
+        .badge-estado { padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.8rem; display: inline-block; }
+        .est-recibido { background-color: #fef3c7; color: #d97706; }
+        .est-gestion { background-color: #e0f2fe; color: #0284c7; }
+        .est-resuelto { background-color: #dcfce7; color: #15803d; }
+        .est-rechazado { background-color: #fee2e2; color: #b91c1c; }
+
+        .search-container { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+        .search-input { width: 100%; max-width: 380px; padding: 10px 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; }
+
+        .table-card { background: #ffffff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); overflow: hidden; }
+        .custom-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .custom-table thead { background-color: #0257b8; color: #ffffff; }
+        .custom-table th { padding: 1rem 0.8rem; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; }
+        .custom-table td { padding: 0.8rem 0.8rem; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; color: #334155; vertical-align: middle; }
+
+        .btn-gestionar { background: #f0f9ff; border: 1px solid #bae6fd; color: #0284c7; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        .btn-descargar { background: #f8fafc; border: 1px solid #cbd5e1; color: #334155; padding: 5px 8px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 0.8rem; display: inline-block; }
+
+        /* MODAL */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 2rem; border-radius: 12px; width: 100%; max-width: 620px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; color: #0056b3; font-size: 1.3rem; }
+        .close-btn { cursor: pointer; font-size: 1.5rem; color: #888; border: none; background: none; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 0.9rem; color: #334155; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem; }
+        .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-guardar { background-color: #0056b3; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn-cancelar { background-color: #64748b; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo-container">
+            <a href="/"><img src="{{ url_for('static', filename='logo_asuaaastab.png') }}" alt="Logo ASUAAASTAB" class="logo"></a>
+        </div>
+        <nav>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('documentos') }}">Generación de Documentos</a></li>
+                <li><a href="{{ url_for('contratacion') }}">Contratación</a></li>
+                <li><a href="{{ url_for('inventario') }}">Control de Inventario</a></li>
+                <li><a href="{{ url_for('pqrsf') }}" class="active-link">PQRSF</a></li>
+                <li><a href="{{ url_for('matriculas') }}">Matrículas</a></li>
+                <li><a href="{{ url_for('pagos_anticipados') }}">Pagos Anticipados</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="dashboard-container">
+            <div class="page-header">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <a href="/" class="btn-accion" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;">← Volver a inicio</a>
+                    <h1 class="page-title">Atención al Usuario - PQRSF</h1>
+                </div>
+                <div class="header-actions">
+                    <a href="{{ url_for('exportar_pqrsf_excel') }}" class="btn-excel">📊 Exportar a Excel</a>
+                    <button class="btn-accion btn-primario" onclick="abrirModal('modalRadicarPQRSF')">✍️ Radicar Solicitud</button>
+                </div>
+            </div>
+
+            <!-- BUSCADOR -->
+            <div class="search-container">
+                <input type="text" id="buscadorTabla" class="search-input" placeholder="Buscar por Radicado, Solicitante, Cédula o Asunto..." onkeyup="filtrarTabla()">
+            </div>
+
+            <!-- TABLA DE PQRSF CON NUEVAS COLUMNAS -->
+            <div class="table-card">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>N° Radicado</th>
+                            <th>Solicitante</th>
+                            <th>Asunto / Adjunto</th>
+                            <th>Fecha Radicación</th>
+                            <th>Fecha Límite (5 Días Hábiles)</th>
+                            <th>Estado</th>
+                            <th style="text-align: center;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in solicitudes %}
+                        <tr class="fila-pqrsf">
+                            <td class="col-radicado">
+                                <strong>{{ s.radicado }}</strong><br>
+                                <small style="color: #0284c7;">{{ s.tipo }}</small>
+                            </td>
+                            <td class="col-solicitante">
+                                <strong>{{ s.nombre }}</strong><br>
+                                <small style="color: #64748b;">C.C. {{ s.documento }}</small>
+                            </td>
+                            <td class="col-asunto">
+                                <span>{{ s.asunto }}</span><br>
+                                {% if s.archivo_adjunto %}
+                                    <a href="{{ url_for('static', filename='uploads_pqrsf/' + s.archivo_adjunto) }}" target="_blank" style="color: #0056b3; font-size: 0.8rem; font-weight: bold;">
+                                        📎 Ver Petición Adjunta
+                                    </a>
+                                {% else %}
+                                    <small style="color: #94a3b8;">Sin adjunto</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ s.fecha_radicacion.strftime('%Y-%m-%d') if s.fecha_radicacion else '' }}</td>
+                            <td>
+                                {% if s.fecha_limite %}
+                                    <strong style="color: #d97706;">📅 {{ s.fecha_limite.strftime('%Y-%m-%d') }}</strong>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if s.estado == 'Recibido' %}
+                                    <span class="badge-estado est-recibido">⏳ Recibido</span>
+                                {% elif s.estado == 'En Gestión' %}
+                                    <span class="badge-estado est-gestion">🔄 En Gestión</span>
+                                {% elif s.estado == 'Resuelto' %}
+                                    <span class="badge-estado est-resuelto">✅ Resuelto</span>
+                                {% else %}
+                                    <span class="badge-estado est-rechazado">❌ Rechazado</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center; white-space: nowrap;">
+                                <button type="button" 
+                                        class="btn-gestionar" 
+                                        data-id="{{ s.id }}"
+                                        data-radicado="{{ s.radicado }}"
+                                        data-nombre="{{ s.nombre }}"
+                                        data-asunto="{{ s.asunto }}"
+                                        data-descripcion="{{ s.descripcion }}"
+                                        data-estado="{{ s.estado }}"
+                                        data-respuesta="{{ s.respuesta or '' }}"
+                                        data-responsable="{{ s.funcionario_responsable or '' }}"
+                                        onclick="prepararRespuesta(this)">🔍 Responder</button>
+
+                                <a href="{{ url_for('descargar_respuesta_pqrsf', pqrsf_id=s.id) }}" target="_blank" class="btn-descargar" title="Descargar oficio oficial de respuesta">
+                                    📄 Documento
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; color: #64748b; padding: 2rem;">
+                                No hay solicitudes de PQRSF radicadas actualmente.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL RADICAR NUEVA PQRSF (CON ARCHIVO ADJUNTO) -->
+    <div id="modalRadicarPQRSF" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Formulario de Radicación PQRSF</h3>
+                <button class="close-btn" onclick="cerrarModal('modalRadicarPQRSF')">&times;</button>
+            </div>
+            <form action="{{ url_for('radicar_pqrsf') }}" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>Tipo de Solicitud:</label>
+                    <select name="tipo" required>
+                        <option value="Petición">Petición</option>
+                        <option value="Queja">Queja</option>
+                        <option value="Reclamo">Reclamo</option>
+                        <option value="Sugerencia">Sugerencia</option>
+                        <option value="Felicitación">Felicitación</option>
+                    </select>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label>Cédula / NIT:</label>
+                        <input type="text" name="documento" required placeholder="Número de identificación">
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Completo:</label>
+                        <input type="text" name="nombre" required placeholder="Nombre del solicitante">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label>Correo Electrónico:</label>
+                        <input type="email" name="correo" required placeholder="correo@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono de Contacto:</label>
+                        <input type="text" name="telefono" required placeholder="Teléfono o Celular">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label>Dirección de Residencia:</label>
+                        <input type="text" name="direccion" placeholder="Ej. Calle 3 # 4-12">
+                    </div>
+                    <div class="form-group">
+                        <label>Sector / Barrio:</label>
+                        <input type="text" name="sector" placeholder="Ej. Sector Centro / Mal Paso">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Asunto:</label>
+                    <input type="text" name="asunto" required placeholder="Resumen de la solicitud">
+                </div>
+
+                <div class="form-group">
+                    <label>Descripción Detallada:</label>
+                    <textarea name="descripcion" rows="3" required placeholder="Describa claramente los hechos o la solicitud..."></textarea>
+                </div>
+
+                <!-- CAMPO PARA ADJUNTAR ARCHIVO / PETICIÓN DEL USUARIO -->
+                <div class="form-group">
+                    <label>Adjuntar Petición o Documento Soporte (PDF / Imagen):</label>
+                    <input type="file" name="archivo_soporte" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal('modalRadicarPQRSF')">Cancelar</button>
+                    <button type="submit" class="btn-guardar">Radicar Solicitud</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL GESTIONAR PQRSF -->
+    <div id="modalGestionarPQRSF" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="gest_radicado">Gestión de Solicitud</h3>
+                <button class="close-btn" onclick="cerrarModal('modalGestionarPQRSF')">&times;</button>
+            </div>
+            <form id="formGestionar" action="" method="POST">
+                <div class="form-group">
+                    <label>Solicitante:</label>
+                    <input type="text" id="gest_nombre" disabled style="background-color: #f1f5f9; font-weight: bold;">
+                </div>
+
+                <div class="form-group">
+                    <label>Asunto:</label>
+                    <input type="text" id="gest_asunto" disabled style="background-color: #f1f5f9;">
+                </div>
+
+                <div class="form-group">
+                    <label>Detalle de la Solicitud:</label>
+                    <textarea id="gest_descripcion" rows="3" disabled style="background-color: #f1f5f9;"></textarea>
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+
+                <div class="form-group">
+                    <label>Estado del Trámite:</label>
+                    <select id="gest_estado" name="estado" required>
+                        <option value="Recibido">Recibido</option>
+                        <option value="En Gestión">En Gestión</option>
+                        <option value="Resuelto">Resuelto</option>
+                        <option value="Rechazado">Rechazado</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Funcionario Responsable:</label>
+                    <input type="text" id="gest_responsable" name="funcionario_responsable" required placeholder="Nombre del funcionario que atiende la solicitud">
+                </div>
+
+                <div class="form-group">
+                    <label>Respuesta Oficial / Observaciones:</label>
+                    <textarea id="gest_respuesta" name="respuesta" rows="4" required placeholder="Escriba la respuesta que se enviará al usuario..."></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal('modalGestionarPQRSF')">Cancelar</button>
+                    <button type="submit" class="btn-guardar">Guardar Respuesta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        function prepararRespuesta(btn) {
+            let data = btn.dataset;
+            document.getElementById('formGestionar').action = "/pqrsf/responder/" + data.id;
+            document.getElementById('gest_radicado').innerText = "Gestión: " + data.radicado;
+            document.getElementById('gest_nombre').value = data.nombre;
+            document.getElementById('gest_asunto').value = data.asunto;
+            document.getElementById('gest_descripcion').value = data.descripcion;
+            document.getElementById('gest_estado').value = data.estado;
+            document.getElementById('gest_responsable').value = data.responsable;
+            document.getElementById('gest_respuesta').value = data.respuesta;
+            abrirModal('modalGestionarPQRSF');
+        }
+
+        function filtrarTabla() {
+            let input = document.getElementById("buscadorTabla").value.toLowerCase();
+            let filas = document.getElementsByClassName("fila-pqrsf");
+
+            for (let i = 0; i < filas.length; i++) {
+                let textRadicado = filas[i].querySelector(".col-radicado").innerText.toLowerCase();
+                let textSolicitante = filas[i].querySelector(".col-solicitante").innerText.toLowerCase();
+                let textAsunto = filas[i].querySelector(".col-asunto").innerText.toLowerCase();
+
+                if (textRadicado.includes(input) || textSolicitante.includes(input) || textAsunto.includes(input)) {
+                    filas[i].style.display = "";
+                } else {
+                    filas[i].style.display = "none";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
