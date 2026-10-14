@@ -2,6 +2,8 @@ import io
 import os
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+load_dotenv()  # Carga la variable DATABASE_URL del archivo .env automáticamente
 
 import pandas as pd
 from flask import (Flask,flash,redirect,render_template,request,send_file,
