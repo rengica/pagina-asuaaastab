@@ -34,6 +34,10 @@ app.secret_key = 'clave_secreta_asuaaastab'
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///inventario.db')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+    
+# Asegurar que si la URL trae -pooler lo limpie automáticamente
+if database_url and '-pooler' in database_url:
+    database_url = database_url.replace('-pooler', '')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
