@@ -34,8 +34,7 @@ app.secret_key = 'clave_secreta_asuaaastab'
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///inventario.db')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql+psycopg2://', 1)
-    
-# Asegurar que si la URL trae -pooler lo limpie automáticamente
+
 if database_url and '-pooler' in database_url:
     database_url = database_url.replace('-pooler', '')
 
@@ -171,6 +170,22 @@ def calcular_meses_diferencia(mes_inicio, mes_final):
 # -------------------------------------------------------------------------
 # 3. MODELOS DE BASE DE DATOS
 # -------------------------------------------------------------------------
+class PQRSF(db.Model):
+    __tablename__ = 'pqrsf'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    radicado = db.Column(db.String(50), unique=True, nullable=False)
+    tipo = db.Column(db.String(50), nullable=False)
+    nombre_solicitante = db.Column('nombre_solicitante', db.String(120), nullable=True)
+    cedula_solicitante = db.Column('cedula_solicitante', db.String(20), nullable=True)
+    correo = db.Column(db.String(120), nullable=True)
+    telefono = db.Column(db.String(20), nullable=True)
+    asunto = db.Column(db.String(200), nullable=True)
+    descripcion = db.Column(db.Text, nullable=True)
+    estado = db.Column(db.String(30), default='EN TRAMITE')
+    fecha_radicacion = db.Column(db.DateTime, default=datetime.now)
+    fecha_limite_respuesta = db.Column(db.DateTime, nullable=True)
+
 class UsuarioMatricula(db.Model):
     __tablename__ = 'usuarios_matricula'
     
@@ -241,7 +256,6 @@ class Configuracion(db.Model):
     clave = db.Column(db.String(50), primary_key=True)
     valor = db.Column(db.Float, default=0.0)
 
-# Helpers para base de datos
 def obtener_cargo_mes_db():
     try:
         conf = db.session.get(Configuracion, 'total_cargo_mes')
@@ -262,12 +276,12 @@ def guardar_cargo_mes_db(nuevo_valor):
     except Exception:
         db.session.rollback()
 
-# Crear las tablas en la base de datos si no existen (SIN BORRAR DATOS EXISTENTES)
+# Inicialización segura de tablas en la base de datos
 with app.app_context():
     try:
         db.create_all()
     except Exception as e:
-        print(f"Error al inicializar la base de datos: {e}")
+        print(f"Error al inicializar las tablas en la base de datos: {e}")
 
 # -------------------------------------------------------------------------
 # 4. RUTAS PRINCIPALES Y NAVEGACIÓN
@@ -281,17 +295,121 @@ def contratacion():
     return "<h1>Módulo de Contratación</h1><p>En construcción...</p>"
 
 # -------------------------------------------------------------------------
-# 5. MÓDULO DE MATRÍCULAS
+# 5. MÓDULO DE PQRSF
+# -------------------------------------------------------------------------
+@app.route('/pqrsf')
+def pqrsf():
+    try:
+        solicitudes = PQRSF.query.order_by(PQRSF.fecha_radicacion.desc()).all()
+    except Exception:
+        db.session.rollback()
+        solicitudes = []
+        
+    total_pqrsf = len(solicitudes)
+    total_pendientes = sum(1 for s in solicitudes if getattr(s, 'estado', 'EN TRAMITE') == 'EN TRAMITE')
+    total_resueltos = sum(1 for s in solicitudes if getattr(s, 'estado', '') == 'RESUELTO')
+    
+    return render_template(
+        'pqrsf.html',
+        solicitudes=solicitudes,
+        total_pqrsf=total_pqrsf,
+        total_pendientes=total_pendientes,
+        total_resueltos=total_resueltos
+    )
+
+@app.route('/pqrsf/guardar', methods=['POST'])
+@app.route('/pqrsf/radicar', methods=['POST'])
+def guardar_pqrsf():
+    try:
+        radicado = f"PQRSF-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        nueva_solicitud = PQRSF(
+            radicado=radicado,
+            tipo=request.form.get('tipo', 'Petición'),
+            nombre_solicitante=request.form.get('nombre_solicitante', request.form.get('nombre', '')).strip(),
+            cedula_solicitante=request.form.get('cedula_solicitante', request.form.get('cedula', '')).strip(),
+            correo=request.form.get('correo', '').strip(),
+            telefono=request.form.get('telefono', '').strip(),
+            asunto=request.form.get('asunto', '').strip(),
+            descripcion=request.form.get('descripcion', '').strip()
+        )
+        db.session.add(nueva_solicitud)
+        db.session.commit()
+        flash(f'Solicitud radicado N° {radicado} guardada.', 'exito')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al registrar solicitud PQRSF: {e}', 'error')
+    return redirect(url_for('pqrsf'))
+
+@app.route('/pqrsf/radicar-directo', methods=['POST'])
+def radicar_pqrsf():
+    return guardar_pqrsf()
+
+@app.route('/pqrsf/cambiar-estado/<int:solicitud_id>', methods=['POST'])
+def cambiar_estado_pqrsf(solicitud_id):
+    solicitud = db.session.get(PQRSF, solicitud_id)
+    if solicitud:
+        nuevo_estado = request.form.get('estado')
+        if nuevo_estado in ['EN TRAMITE', 'RESUELTO', 'RECHAZADO']:
+            solicitud.estado = nuevo_estado
+            db.session.commit()
+            flash(f'Estado del radicado {solicitud.radicado} actualizado a {nuevo_estado}.', 'exito')
+    return redirect(url_for('pqrsf'))
+
+@app.route('/pqrsf/eliminar/<int:solicitud_id>', methods=['POST'])
+def eliminar_pqrsf(solicitud_id):
+    solicitud = db.session.get(PQRSF, solicitud_id)
+    if solicitud:
+        db.session.delete(solicitud)
+        db.session.commit()
+        flash('Registro PQRSF eliminado correctamente.', 'exito')
+    return redirect(url_for('pqrsf'))
+
+@app.route('/pqrsf/exportar-excel')
+def exportar_pqrsf_excel():
+    try:
+        solicitudes = PQRSF.query.all()
+    except Exception:
+        db.session.rollback()
+        solicitudes = []
+
+    datos = []
+    for s in solicitudes:
+        datos.append({
+            'Radicado': getattr(s, 'radicado', ''),
+            'Tipo': getattr(s, 'tipo', ''),
+            'Solicitante': getattr(s, 'nombre_solicitante', ''),
+            'Cédula': getattr(s, 'cedula_solicitante', ''),
+            'Correo': getattr(s, 'correo', ''),
+            'Teléfono': getattr(s, 'telefono', ''),
+            'Asunto': getattr(s, 'asunto', ''),
+            'Descripción': getattr(s, 'descripcion', ''),
+            'Estado': getattr(s, 'estado', ''),
+            'Fecha Radicación': s.fecha_radicacion.strftime('%Y-%m-%d %H:%M') if getattr(s, 'fecha_radicacion', None) else ''
+        })
+
+    df = pd.DataFrame(datos)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='PQRSF')
+    output.seek(0)
+    
+    filename = f"PQRSF_ASUAAASTAB_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return send_file(
+        output,
+        download_name=filename,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+# -------------------------------------------------------------------------
+# 6. MÓDULO DE MATRÍCULAS
 # -------------------------------------------------------------------------
 @app.route('/matriculas')
 def matriculas():
     usuarios = UsuarioMatricula.query.order_by(UsuarioMatricula.fecha_compra.desc()).all()
-    
     total_usuarios = len(usuarios)
     total_activos = sum(1 for u in usuarios if u.estado_matricula == 'ACTIVO')
     total_inactivos = sum(1 for u in usuarios if u.estado_matricula == 'INACTIVO')
     total_suspendidos = sum(1 for u in usuarios if u.estado_matricula == 'SUSPENDIDO')
-    
     return render_template(
         'matriculas.html',
         usuarios=usuarios,
@@ -394,19 +512,16 @@ def eliminar_matricula(user_id):
     return redirect(url_for('matriculas'))
 
 # -------------------------------------------------------------------------
-# 6. MÓDULO DE PAGOS ANTICIPADOS
+# 7. MÓDULO DE PAGOS ANTICIPADOS
 # -------------------------------------------------------------------------
 @app.route('/pagos-anticipados')
 def pagos_anticipados():
     pagos = PagoAnticipado.query.all()
-    
     total_recaudado = sum(p.valor_total or 0.0 for p in pagos)
     total_saldo_disponible = sum(p.saldo_pendiente or 0.0 for p in pagos)
     total_aplicado = total_recaudado - total_saldo_disponible
-    
     total_cargo_mes = obtener_cargo_mes_db()
     consumido_es_cero = (total_cargo_mes == 0.0)
-    
     return render_template(
         'pagos_anticipados.html',
         pagos=pagos,
@@ -433,7 +548,6 @@ def guardar_pago_anticipado():
     mes_inicio = request.form.get('mes_inicio')
     mes_final = request.form.get('mes_final') or mes_inicio
     valor_total = float(request.form.get('valor_total') or 0.0)
-    
     valor_unitario = valor_total / numero_meses if numero_meses > 0 else 0.0
     
     nuevo_pago = PagoAnticipado(
@@ -449,7 +563,6 @@ def guardar_pago_anticipado():
         valor_total=valor_total,
         saldo_pendiente=valor_total
     )
-    
     db.session.add(nuevo_pago)
     db.session.commit()
     flash('Pago anticipado registrado correctamente.', 'exito')
@@ -469,14 +582,12 @@ def descontar_pago_anticipado(id):
 @app.route('/pagos-anticipados/cargar-mes', methods=['POST'])
 def cargar_mes_anticipado():
     target = request.form.get('target_usuario')
-    
     if target == 'TODOS':
         pagos = PagoAnticipado.query.filter(PagoAnticipado.meses_restantes > 0).all()
     else:
         pagos = PagoAnticipado.query.filter(PagoAnticipado.id == int(target), PagoAnticipado.meses_restantes > 0).all()
     
     cargo_procesado_este_mes = 0.0
-    
     for p in pagos:
         if p.meses_restantes > 0:
             cargo_procesado_este_mes += p.valor_unitario
@@ -505,9 +616,7 @@ def certificado_pago_anticipado(pago_id):
     if not pago:
         flash('Registro no encontrado.', 'error')
         return redirect(url_for('pagos_anticipados'))
-        
     hoy = datetime.now()
-
     return render_template(
         'certificado_pago_anticipado_print.html',
         pago=pago,
@@ -535,12 +644,7 @@ def editar_pago_anticipado(pago_id):
     pago.mes_final = request.form.get('mes_final')
     pago.numero_meses = numero_meses
     pago.valor_total = valor_total
-    
-    if numero_meses > 0:
-        pago.valor_unitario = valor_total / numero_meses
-    else:
-        pago.valor_unitario = 0.0
-        
+    pago.valor_unitario = valor_total / numero_meses if numero_meses > 0 else 0.0
     pago.meses_restantes = meses_restantes
     pago.saldo_pendiente = pago.valor_unitario * meses_restantes
     
@@ -551,7 +655,6 @@ def editar_pago_anticipado(pago_id):
 @app.route('/pagos-anticipados/exportar-excel')
 def exportar_excel_pagos():
     pagos = PagoAnticipado.query.all()
-    
     datos = []
     for p in pagos:
         datos.append({
@@ -568,14 +671,11 @@ def exportar_excel_pagos():
             'Saldo Pendiente ($)': p.saldo_pendiente,
             'Fecha Registro': p.fecha_registro.strftime('%Y-%m-%d %H:%M') if p.fecha_registro else ''
         })
-    
     df = pd.DataFrame(datos)
-    
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Pagos Anticipados')
     output.seek(0)
-    
     return send_file(
         output,
         download_name='Pagos_Anticipados_ASUAAASTAB.xlsx',
@@ -584,7 +684,7 @@ def exportar_excel_pagos():
     )
 
 # -------------------------------------------------------------------------
-# 7. MÓDULO DE INVENTARIO
+# 8. MÓDULO DE INVENTARIO
 # -------------------------------------------------------------------------
 @app.route('/inventario')
 def inventario():
@@ -608,7 +708,6 @@ def crear_producto():
     )
     db.session.add(nuevo_producto)
     db.session.commit()
-
     flash('Producto registrado exitosamente.', 'success')
     return redirect(url_for('inventario'))
 
@@ -638,7 +737,6 @@ def registrar_movimiento(prod_id):
 
     db.session.add(nuevo_movimiento)
     db.session.commit()
-
     flash('Movimiento registrado correctamente.', 'success')
     return redirect(url_for('inventario'))
 
@@ -670,7 +768,6 @@ def historial_producto(prod_id):
 @app.route('/inventario/exportar-excel')
 def exportar_inventario_excel():
     productos = Producto.query.all()
-    
     datos = []
     for p in productos:
         datos.append({
@@ -681,19 +778,16 @@ def exportar_inventario_excel():
             'Unidad de Medida': p.unidad,
             'Ubicación': p.ubicacion or 'N/A'
         })
-    
     df = pd.DataFrame(datos)
-    
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Inventario')
     output.seek(0)
-    
     filename = f"Inventario_ASUAAASTAB_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 # -------------------------------------------------------------------------
-# 8. MÓDULO DE DOCUMENTOS
+# 9. MÓDULO DE DOCUMENTOS
 # -------------------------------------------------------------------------
 @app.route('/documentos')
 def documentos():
@@ -724,6 +818,20 @@ def documentos():
         }
     ]
     return render_template('documentos.html', documentos=tipos_documentos)
+
+@app.route('/documentos/factura-venta', methods=['GET', 'POST'])
+def factura_venta():
+    if request.method == 'POST':
+        consecutivo = obtener_siguiente_consecutivo_factura()
+        return render_template('factura_venta_print.html', consecutivo=consecutivo)
+    consecutivo_vista = ver_siguiente_consecutivo_factura()
+    return render_template('factura_venta_form.html', consecutivo=consecutivo_vista)
+
+@app.route('/documentos/certificado-servicios', methods=['GET', 'POST'])
+def certificado_servicios():
+    if request.method == 'POST':
+        return render_template('certificado_servicios_print.html')
+    return render_template('certificado_servicios_form.html')
 
 @app.route('/documentos/certificacion-laboral', methods=['GET', 'POST'])
 def certificacion_laboral():
@@ -836,7 +944,7 @@ def documento_equivalente():
     return render_template('documento_equivalente_form.html', consecutivo=consecutivo_vista, datetime=datetime.now().strftime('%Y-%m-%d'))
 
 # -------------------------------------------------------------------------
-# 9. EJECUCIÓN PRINCIPAL
+# 10. EJECUCIÓN
 # -------------------------------------------------------------------------
 if __name__ == '__main__':
     app.run(debug=True)
