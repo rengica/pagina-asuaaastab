@@ -189,17 +189,16 @@ class Producto(db.Model):
     cantidad = db.Column(db.Integer, default=0)
     unidad = db.Column(db.String(20), default='Unidades')
     ubicacion = db.Column(db.String(100))
-    # Relación con el historial de movimientos
     movimientos = db.relationship('MovimientoInventario', backref='producto', lazy=True, cascade="all, delete-orphan")
 
 class MovimientoInventario(db.Model):
     __tablename__ = 'movimiento_inventario'
     id = db.Column(db.Integer, primary_key=True)
     producto_id = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
-    tipo = db.Column(db.String(10), nullable=False) # 'ENTRADA' o 'SALIDA'
+    tipo = db.Column(db.String(10), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False)
-    responsable = db.Column(db.String(100), nullable=False)  # Persona que ejecutó la acción
-    motivo = db.Column(db.String(255), nullable=False)       # Con qué fin / observaciones
+    responsable = db.Column(db.String(100), nullable=False)
+    motivo = db.Column(db.String(255), nullable=False)
     fecha = db.Column(db.DateTime, default=datetime.now)
 
 class PagoAnticipado(db.Model):
@@ -238,23 +237,33 @@ class Configuracion(db.Model):
     clave = db.Column(db.String(50), primary_key=True)
     valor = db.Column(db.Float, default=0.0)
 
-# Helpers para base de datos con sintaxis SQLAlchemy 2.0 (Evita warnings)
+# Helpers para base de datos
 def obtener_cargo_mes_db():
-    conf = db.session.get(Configuracion, 'total_cargo_mes')
-    return conf.valor if conf else 0.0
+    try:
+        conf = db.session.get(Configuracion, 'total_cargo_mes')
+        return conf.valor if conf else 0.0
+    except Exception:
+        db.session.rollback()
+        return 0.0
 
 def guardar_cargo_mes_db(nuevo_valor):
-    conf = db.session.get(Configuracion, 'total_cargo_mes')
-    if not conf:
-        conf = Configuracion(clave='total_cargo_mes', valor=nuevo_valor)
-        db.session.add(conf)
-    else:
-        conf.valor = nuevo_valor
-    db.session.commit()
+    try:
+        conf = db.session.get(Configuracion, 'total_cargo_mes')
+        if not conf:
+            conf = Configuracion(clave='total_cargo_mes', valor=nuevo_valor)
+            db.session.add(conf)
+        else:
+            conf.valor = nuevo_valor
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
-# Crear las tablas en la base de datos si no existen (SIN BORRAR DATOS)
+# Crear las tablas en la base de datos si no existen (SIN BORRAR DATOS EXISTENTES)
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        print(f"Error al inicializar la base de datos: {e}")
 
 # -------------------------------------------------------------------------
 # 4. RUTAS PRINCIPALES Y NAVEGACIÓN
@@ -821,3 +830,9 @@ def documento_equivalente():
 
     consecutivo_vista = ver_siguiente_consecutivo()
     return render_template('documento_equivalente_form.html', consecutivo=consecutivo_vista, datetime=datetime.now().strftime('%Y-%m-%d'))
+
+# -------------------------------------------------------------------------
+# 9. EJECUCIÓN PRINCIPAL
+# -------------------------------------------------------------------------
+if __name__ == '__main__':
+    app.run(debug=True)
