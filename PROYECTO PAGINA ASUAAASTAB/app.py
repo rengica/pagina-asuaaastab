@@ -23,6 +23,7 @@ from flask import (
     url_for,
 )
 from flask_sqlalchemy import SQLAlchemy 
+
 # -------------------------------------------------------------------------
 # 1. INICIALIZACIÓN Y CONFIGURACIÓN DE FLASK & SQLALCHEMY
 # -------------------------------------------------------------------------
@@ -251,8 +252,8 @@ def guardar_cargo_mes_db(nuevo_valor):
         conf.valor = nuevo_valor
     db.session.commit()
 
+# Crear las tablas en la base de datos si no existen (SIN BORRAR DATOS)
 with app.app_context():
-    db.drop_all() 
     db.create_all()
 
 # -------------------------------------------------------------------------
@@ -266,13 +267,11 @@ def inicio():
 def contratacion():
     return "<h1>Módulo de Contratación</h1><p>En construcción...</p>"
 
-
 # -------------------------------------------------------------------------
 # 5. MÓDULO DE MATRÍCULAS
 # -------------------------------------------------------------------------
 @app.route('/matriculas')
 def matriculas():
-    # Ordenar por fecha_compra descendente (la fecha más reciente aparece de primera)
     usuarios = UsuarioMatricula.query.order_by(UsuarioMatricula.fecha_compra.desc()).all()
     
     total_usuarios = len(usuarios)
@@ -289,10 +288,8 @@ def matriculas():
         total_suspendidos=total_suspendidos
     )
 
-
 @app.route('/matriculas/cambiar-estado/<int:user_id>', methods=['POST'])
 def cambiar_estado_matricula(user_id):
-    """Permite cambiar el estado (Activo, Inactivo, Suspendido) directamente desde la tabla."""
     usuario = db.session.get(UsuarioMatricula, user_id)
     if usuario:
         nuevo_estado = request.form.get('estado_matricula')
@@ -301,7 +298,6 @@ def cambiar_estado_matricula(user_id):
             db.session.commit()
             flash(f'Estado del usuario {usuario.codigo} actualizado a {nuevo_estado}.', 'exito')
     return redirect(url_for('matriculas'))
-
 
 @app.route('/matriculas/guardar', methods=['POST'])
 def guardar_matricula():
@@ -346,7 +342,6 @@ def guardar_matricula():
     flash('Usuario matriculado exitosamente.', 'exito')
     return redirect(url_for('matriculas'))
 
-
 @app.route('/matriculas/editar/<int:user_id>', methods=['POST'])
 def editar_matricula(user_id):
     usuario = db.session.get(UsuarioMatricula, user_id)
@@ -375,7 +370,6 @@ def editar_matricula(user_id):
     db.session.commit()
     flash('Información de matrícula actualizada correctamente.', 'exito')
     return redirect(url_for('matriculas'))
-
 
 @app.route('/matriculas/eliminar/<int:user_id>', methods=['POST'])
 def eliminar_matricula(user_id):
@@ -608,12 +602,11 @@ def crear_producto():
 @app.route('/inventario/movimiento/<int:prod_id>', methods=['POST'])
 def registrar_movimiento(prod_id):
     producto = Producto.query.get_or_404(prod_id)
-    tipo = request.form.get('tipo')  # 'ENTRADA' o 'SALIDA'
+    tipo = request.form.get('tipo')
     cantidad = int(request.form.get('cantidad', 0))
     responsable = request.form.get('responsable')
     motivo = request.form.get('motivo')
 
-    # Actualizar stock del producto
     if tipo == 'ENTRADA':
         producto.cantidad += cantidad
     elif tipo == 'SALIDA':
@@ -622,7 +615,6 @@ def registrar_movimiento(prod_id):
             return redirect(url_for('inventario'))
         producto.cantidad -= cantidad
 
-    # Registrar el movimiento en la base de datos
     nuevo_movimiento = MovimientoInventario(
         producto_id=producto.id,
         tipo=tipo,
@@ -636,7 +628,7 @@ def registrar_movimiento(prod_id):
 
     flash('Movimiento registrado correctamente.', 'success')
     return redirect(url_for('inventario'))
-# 1. EDITAR PRODUCTO
+
 @app.route('/inventario/editar/<int:prod_id>', methods=['POST'])
 def editar_producto(prod_id):
     producto = Producto.query.get_or_404(prod_id)
@@ -648,7 +640,6 @@ def editar_producto(prod_id):
     flash('Producto actualizado correctamente.', 'success')
     return redirect(url_for('inventario'))
 
-# 2. ELIMINAR PRODUCTO
 @app.route('/inventario/eliminar/<int:prod_id>', methods=['POST'])
 def eliminar_producto(prod_id):
     producto = Producto.query.get_or_404(prod_id)
@@ -657,19 +648,16 @@ def eliminar_producto(prod_id):
     flash('Producto eliminado del inventario.', 'success')
     return redirect(url_for('inventario'))
 
-# 3. VER HISTORIAL DEL PRODUCTO
 @app.route('/inventario/historial/<int:prod_id>')
 def historial_producto(prod_id):
     producto = Producto.query.get_or_404(prod_id)
     movimientos = MovimientoInventario.query.filter_by(producto_id=prod_id).order_by(MovimientoInventario.fecha.desc()).all()
     return render_template('historial_producto.html', producto=producto, movimientos=movimientos)
 
-# 4. EXPORTAR A EXCEL
 @app.route('/inventario/exportar-excel')
 def exportar_inventario_excel():
     productos = Producto.query.all()
     
-    # Crear estructura de datos
     datos = []
     for p in productos:
         datos.append({
@@ -681,10 +669,8 @@ def exportar_inventario_excel():
             'Ubicación': p.ubicacion or 'N/A'
         })
     
-    # Convertir a DataFrame de Pandas
     df = pd.DataFrame(datos)
     
-    # Guardar en memoria virtual para descarga inmediata
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Inventario')
@@ -692,6 +678,7 @@ def exportar_inventario_excel():
     
     filename = f"Inventario_ASUAAASTAB_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 # -------------------------------------------------------------------------
 # 8. MÓDULO DE DOCUMENTOS
 # -------------------------------------------------------------------------
@@ -834,294 +821,3 @@ def documento_equivalente():
 
     consecutivo_vista = ver_siguiente_consecutivo()
     return render_template('documento_equivalente_form.html', consecutivo=consecutivo_vista, datetime=datetime.now().strftime('%Y-%m-%d'))
-
-@app.route('/documentos/factura-venta', methods=['GET', 'POST'])
-def factura_venta():
-    if request.method == 'POST':
-        consecutivo = obtener_siguiente_consecutivo_factura()
-        fecha_str = request.form.get('fecha', datetime.now().strftime('%Y-%m-%d'))
-        
-        try:
-            f_dt = datetime.strptime(fecha_str, '%Y-%m-%d')
-            dia, mes, anio = f_dt.strftime('%d'), f_dt.strftime('%m'), f_dt.strftime('%Y')
-        except ValueError:
-            f_hoy = datetime.now()
-            dia, mes, anio = f_hoy.strftime('%d'), f_hoy.strftime('%m'), f_hoy.strftime('%Y')
-
-        cliente = request.form.get('cliente', '').strip()
-        documento = request.form.get('documento', '').strip()
-        direccion = request.form.get('direccion', 'El Tablón de Gómez').strip()
-
-        cantidades = request.form.getlist('cantidad[]')
-        conceptos = request.form.getlist('concepto[]')
-        v_unitarios = request.form.getlist('v_unitario[]')
-
-        items = []
-        subtotal = 0.0
-
-        def fmt_cop(val):
-            if val is None or val == '' or val == 0:
-                return ''
-            return f"$ {val:,.0f}".replace(',', '.')
-
-        for i, (cant, conc, vu) in enumerate(zip(cantidades, conceptos, v_unitarios)):
-            c_txt = conc.strip()
-            cant_val = limpiar_monto(cant)
-            vu_val = limpiar_monto(vu)
-            total_item = (cant_val * vu_val) if (cant_val and vu_val) else (vu_val if vu_val else 0.0)
-
-            if c_txt or total_item > 0:
-                cant_disp = int(cant_val) if cant_val.is_integer() and cant_val > 0 else (cant_val if cant_val > 0 else '')
-                items.append({
-                    'cantidad': cant_disp,
-                    'concepto': c_txt,
-                    'v_unitario': fmt_cop(vu_val),
-                    'total': fmt_cop(total_item),
-                    'destacar_total': True if (i == 0 and total_item > 0) else False
-                })
-                subtotal += total_item
-
-        while len(items) < 8:
-            items.append({
-                'cantidad': '',
-                'concepto': '',
-                'v_unitario': '',
-                'total': '',
-                'destacar_total': False
-            })
-
-        retefuente = limpiar_monto(request.form.get('retefuente'))
-        reteica = limpiar_monto(request.form.get('reteica'))
-        neto = subtotal - retefuente - reteica
-
-        datos = {
-            'consecutivo': consecutivo,
-            'dia': dia,
-            'mes': mes,
-            'anio': anio,
-            'fecha_formateada': f"{dia}/{mes}/{anio}",
-            'cliente': cliente,
-            'documento': documento,
-            'direccion': direccion,
-            'lista_items': items,
-            'subtotal': fmt_cop(subtotal),
-            'retefuente': fmt_cop(retefuente),
-            'reteica': fmt_cop(reteica),
-            'neto': fmt_cop(neto)
-        }
-        return render_template('factura_venta_print.html', datos=datos)
-
-    consecutivo_vista = ver_siguiente_consecutivo_factura()
-    return render_template('factura_venta_form.html', consecutivo=consecutivo_vista, datetime=datetime.now().strftime('%Y-%m-%d'))
-
-@app.route('/documentos/certificado-servicios', methods=['GET', 'POST'])
-def certificado_servicios():
-    if request.method == 'POST':
-        trato_usuario = request.form.get('trato_usuario', 'El señor').strip()
-        nombre_usuario = request.form.get('nombre_usuario', '').strip()
-        documento = request.form.get('documento', '').strip()
-        codigo_usuario = request.form.get('codigo_usuario', '').strip()
-        direccion_predio = request.form.get('direccion_predio', '').strip()
-        barrio = request.form.get('barrio', 'Centro').strip()
-        estado_servicio = request.form.get('estado_servicio', 'ACTIVO Y A PAZ Y SALVO').strip()
-        destinatario = request.form.get('destinatario', 'A QUIEN INTERESE').strip()
-        fecha_expedicion_str = request.form.get('fecha_expedicion', datetime.now().strftime('%Y-%m-%d'))
-
-        nombre_firmante = request.form.get('nombre_firmante', 'ANGIE RUEDA ERAZO').strip()
-        cargo_firmante = request.form.get('cargo_firmante', 'Representante Legal').strip()
-
-        es_femenino = (trato_usuario == 'La señora')
-
-        try:
-            f_dt = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d')
-            fecha_texto = f"a los {f_dt.day} días del mes de {MESES[f_dt.month - 1]} de {f_dt.year}"
-        except Exception:
-            fecha_texto = datetime.now().strftime('%d/%m/%Y')
-
-        datos = {
-            'trato_usuario': trato_usuario,
-            'nombre_usuario': nombre_usuario,
-            'documento': documento,
-            'codigo_usuario': codigo_usuario,
-            'direccion_predio': direccion_predio,
-            'barrio': barrio,
-            'estado_servicio': estado_servicio,
-            'destinatario': destinatario,
-            'fecha_texto': fecha_texto,
-            'nombre_firmante': nombre_firmante,
-            'cargo_firmante': cargo_firmante,
-            'identificado': 'identificada' if es_femenino else 'identificado',
-            'matriculado': 'matriculada' if es_femenino else 'matriculado',
-            'vinculado': 'vinculada' if es_femenino else 'vinculado',
-            'usuario_word': 'usuaria' if es_femenino else 'usuario',
-            'el_usuario': 'la usuaria' if es_femenino else 'el usuario',
-            'del_interesado': 'de la interesada' if es_femenino else 'del interesado'
-        }
-        return render_template('certificado_servicios_print.html', datos=datos)
-
-    return render_template('certificado_servicios_form.html', datetime=datetime.now().strftime('%Y-%m-%d'))
-# ---------------------------------------------------------------------------
-# MODELO BASE DE DATOS PARA PQRSF
-# ---------------------------------------------------------------------------
-class PQRSF(db.Model):
-    __tablename__ = 'pqrsf'
-    id = db.Column(db.Integer, primary_key=True)
-    radicado = db.Column(db.String(30), unique=True, nullable=False)
-    tipo = db.Column(db.String(30), nullable=False)
-    
-    # Datos del Solicitante
-    documento = db.Column(db.String(20), nullable=False)
-    nombre = db.Column(db.String(120), nullable=False)
-    correo = db.Column(db.String(120), nullable=False)
-    telefono = db.Column(db.String(20), nullable=False)
-    direccion = db.Column(db.String(150))
-    sector = db.Column(db.String(100))
-    
-    # Detalle y Adjuntos de la Solicitud
-    asunto = db.Column(db.String(200), nullable=False)
-    descripcion = db.Column(db.Text, nullable=False)
-    archivo_adjunto = db.Column(db.String(255)) # Nombre del archivo soporte subido por el usuario
-    
-    # Tiempos y Control
-    fecha_radicacion = db.Column(db.DateTime, default=datetime.now)
-    fecha_limite = db.Column(db.DateTime) # Calculada a 5 días hábiles
-    
-    # Estado y Respuesta Administrativa
-    estado = db.Column(db.String(30), default='Recibido') # Recibido, En Gestión, Resuelto, Rechazado
-    respuesta = db.Column(db.Text)
-    funcionario_responsable = db.Column(db.String(100))
-    fecha_respuesta = db.Column(db.DateTime)
-# ---------------------------------------------------------------------------
-# RUTAS DE PQRSF
-# ---------------------------------------------------------------------------
-
-# 1. VISTA PRINCIPAL PQRSF
-@app.route('/pqrsf')
-def pqrsf():
-    solicitudes = PQRSF.query.order_by(PQRSF.fecha_radicacion.desc()).all()
-    return render_template('pqrsf.html', solicitudes=solicitudes)
-
-# 2. RADICAR NUEVA PQRSF (PÚBLICO)
-# 1. RADICAR NUEVA PQRSF (Con adjunto y fecha límite de 5 días hábiles)
-# ===========================================================================
-# FUNCIONES AUXILIARES DE PQRSF
-# ===========================================================================
-def calcular_dias_habiles(fecha_inicio, dias=5):
-    fecha_actual = fecha_inicio
-    dias_sumados = 0
-    while dias_sumados < dias:
-        fecha_actual += timedelta(days=1)
-        # 0: Lunes, 1: Martes, ..., 4: Viernes, 5: Sábado, 6: Domingo
-        if fecha_actual.weekday() < 5:
-            dias_sumados += 1
-    return fecha_actual
-
-@app.route('/pqrsf/radicar', methods=['POST'])
-def radicar_pqrsf():
-    tipo = request.form.get('tipo')
-    documento = request.form.get('documento')
-    nombre = request.form.get('nombre')
-    correo = request.form.get('correo')
-    telefono = request.form.get('telefono')
-    direccion = request.form.get('direccion')
-    sector = request.form.get('sector')
-    asunto = request.form.get('asunto')
-    descripcion = request.form.get('descripcion')
-
-    # Manejo del archivo adjunto subido por el usuario
-    archivo = request.files.get('archivo_soporte')
-    nombre_archivo = None
-    if archivo and archivo.filename != '':
-        filename = secure_filename(archivo.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-        nombre_archivo = timestamp + filename
-        archivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo))
-
-    # Consecutivo y radicado
-    consecutivo = PQRSF.query.count() + 1
-    numero_radicado = f"PQRSF-{datetime.now().year}-{consecutivo:04d}"
-
-    # Cálculo de los 5 días hábiles
-    fecha_actual = datetime.now()
-    fecha_limite = calcular_dias_habiles(fecha_actual, dias=5)
-
-    nueva_pqrsf = PQRSF(
-        radicado=numero_radicado,
-        tipo=tipo,
-        documento=documento,
-        nombre=nombre,
-        correo=correo,
-        telefono=telefono,
-        direccion=direccion,
-        sector=sector,
-        asunto=asunto,
-        descripcion=descripcion,
-        archivo_adjunto=nombre_archivo,
-        fecha_radicacion=fecha_actual,
-        fecha_limite=fecha_limite
-    )
-
-    db.session.add(nueva_pqrsf)
-    db.session.commit()
-
-    flash(f'Su solicitud ha sido radicada. Número de Radicado: {numero_radicado}. Fecha límite de respuesta: {fecha_limite.strftime("%Y-%m-%d")}', 'success')
-    return redirect(url_for('pqrsf'))
-
-
-# 2. GENERAR Y DESCARGAR RESPUESTA OFICIAL DE LA PQRSF EN DOCUMENTO HTML/PRINTABLE
-@app.route('/pqrsf/descargar-respuesta/<int:pqrsf_id>')
-def descargar_respuesta_pqrsf(pqrsf_id):
-    solicitud = PQRSF.query.get_or_404(pqrsf_id)
-    return render_template('formato_respuesta_pqrsf.html', s=solicitud, fecha_actual=datetime.now())
-
-# 3. GESTIONAR / RESPONDER PQRSF (ADMINISTRATIVO)
-@app.route('/pqrsf/responder/<int:pqrsf_id>', methods=['POST'])
-def responder_pqrsf(pqrsf_id):
-    solicitud = PQRSF.query.get_or_404(pqrsf_id)
-    solicitud.estado = request.form.get('estado')
-    solicitud.respuesta = request.form.get('respuesta')
-    solicitud.funcionario_responsable = request.form.get('funcionario_responsable')
-    solicitud.fecha_respuesta = datetime.now()
-
-    db.session.commit()
-    flash(f'La solicitud {solicitud.radicado} ha sido actualizada.', 'success')
-    return redirect(url_for('pqrsf'))
-
-# 4. EXPORTAR REPORTE PQRSF A EXCEL
-@app.route('/pqrsf/exportar-excel')
-def exportar_pqrsf_excel():
-    solicitudes = PQRSF.query.all()
-    
-    datos = []
-    for s in solicitudes:
-        datos.append({
-            'N° Radicado': s.radicado,
-            'Tipo': s.tipo,
-            'Fecha Radicación': s.fecha_radicacion.strftime('%Y-%m-%d %H:%M') if s.fecha_radicacion else '',
-            'Documento': s.documento,
-            'Nombre Solicitante': s.nombre,
-            'Correo': s.correo,
-            'Teléfono': s.telefono,
-            'Dirección / Sector': f"{s.direccion or ''} - {s.sector or ''}",
-            'Asunto': s.asunto,
-            'Descripción': s.descripcion,
-            'Estado': s.estado,
-            'Respuesta Oficial': s.respuesta or 'Pendiente',
-            'Funcionario Responsable': s.funcionario_responsable or 'Sin asignar',
-            'Fecha Respuesta': s.fecha_respuesta.strftime('%Y-%m-%d %H:%M') if s.fecha_respuesta else ''
-        })
-    
-    df = pd.DataFrame(datos)
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Reporte_PQRSF')
-    output.seek(0)
-    
-    filename = f"Reporte_PQRSF_ASUAAASTAB_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-# -------------------------------------------------------------------------
-# 9. ARRANQUE DE LA APLICACIÓN
-# -------------------------------------------------------------------------
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
