@@ -297,12 +297,31 @@ def contratacion():
 # -------------------------------------------------------------------------
 # 5. MÓDULO DE PQRSF
 # -------------------------------------------------------------------------
+class PQRSF(db.Model):
+    __tablename__ = 'PQRSF'
+    __table_args__ = {'extend_existing': True}
+    
+    id = db.Column(db.Integer, primary_key=True)
+    radicado = db.Column(db.String(50), unique=True, nullable=False)
+    tipo = db.Column(db.String(50), nullable=False)
+    nombre_solicitante = db.Column(db.String(120), nullable=True)
+    cedula_solicitante = db.Column(db.String(20), nullable=True)
+    correo = db.Column(db.String(120), nullable=True)
+    telefono = db.Column(db.String(20), nullable=True)
+    asunto = db.Column(db.String(200), nullable=True)
+    descripcion = db.Column(db.Text, nullable=True)
+    estado = db.Column(db.String(30), default='EN TRAMITE')
+    fecha_radicacion = db.Column(db.DateTime, default=datetime.now)
+    fecha_limite_respuesta = db.Column(db.DateTime, nullable=True)
+
+
 @app.route('/pqrsf')
 def pqrsf():
     try:
         solicitudes = PQRSF.query.order_by(PQRSF.fecha_radicacion.desc()).all()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        print(f"Error al obtener solicitudes PQRSF: {e}")
         solicitudes = []
         
     total_pqrsf = len(solicitudes)
@@ -317,52 +336,89 @@ def pqrsf():
         total_resueltos=total_resueltos
     )
 
+
 @app.route('/pqrsf/guardar', methods=['POST'])
 @app.route('/pqrsf/radicar', methods=['POST'])
 def guardar_pqrsf():
     try:
+        # Generar radicado único
         radicado = f"PQRSF-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        # Obtener valores soportando ambas convenciones de campos del formulario
+        nombre = request.form.get('nombre_solicitante') or request.form.get('nombre') or ''
+        cedula = request.form.get('cedula_solicitante') or request.form.get('cedula') or ''
+        tipo = request.form.get('tipo', 'Petición')
+        correo = request.form.get('correo', '').strip()
+        telefono = request.form.get('telefono', '').strip()
+        asunto = request.form.get('asunto', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+
+        # Calcular fecha límite de respuesta (15 días hábiles aproximadamente)
+        fecha_radicacion = datetime.now()
+        fecha_limite = fecha_radicacion + timedelta(days=15)
+
         nueva_solicitud = PQRSF(
             radicado=radicado,
-            tipo=request.form.get('tipo', 'Petición'),
-            nombre_solicitante=request.form.get('nombre_solicitante', request.form.get('nombre', '')).strip(),
-            cedula_solicitante=request.form.get('cedula_solicitante', request.form.get('cedula', '')).strip(),
-            correo=request.form.get('correo', '').strip(),
-            telefono=request.form.get('telefono', '').strip(),
-            asunto=request.form.get('asunto', '').strip(),
-            descripcion=request.form.get('descripcion', '').strip()
+            tipo=tipo,
+            nombre_solicitante=nombre.strip(),
+            cedula_solicitante=cedula.strip(),
+            correo=correo,
+            telefono=telefono,
+            asunto=asunto,
+            descripcion=descripcion,
+            estado='EN TRAMITE',
+            fecha_radicacion=fecha_radicacion,
+            fecha_limite_respuesta=fecha_limite
         )
+
         db.session.add(nueva_solicitud)
         db.session.commit()
-        flash(f'Solicitud radicado N° {radicado} guardada.', 'exito')
+        flash(f'Solicitud radicado N° {radicado} creada exitosamente.', 'exito')
+
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al registrar solicitud PQRSF: {e}', 'error')
+        print(f"Error crítico al guardar PQRSF: {e}")
+        flash(f'Error al guardar en la base de datos: {e}', 'error')
+
     return redirect(url_for('pqrsf'))
+
 
 @app.route('/pqrsf/radicar-directo', methods=['POST'])
 def radicar_pqrsf():
     return guardar_pqrsf()
 
+
 @app.route('/pqrsf/cambiar-estado/<int:solicitud_id>', methods=['POST'])
 def cambiar_estado_pqrsf(solicitud_id):
-    solicitud = db.session.get(PQRSF, solicitud_id)
-    if solicitud:
-        nuevo_estado = request.form.get('estado')
-        if nuevo_estado in ['EN TRAMITE', 'RESUELTO', 'RECHAZADO']:
-            solicitud.estado = nuevo_estado
-            db.session.commit()
-            flash(f'Estado del radicado {solicitud.radicado} actualizado a {nuevo_estado}.', 'exito')
+    try:
+        solicitud = db.session.get(PQRSF, solicitud_id)
+        if solicitud:
+            nuevo_estado = request.form.get('estado')
+            if nuevo_estado in ['EN TRAMITE', 'RESUELTO', 'RECHAZADO']:
+                solicitud.estado = nuevo_estado
+                db.session.commit()
+                flash(f'Estado del radicado {solicitud.radicado} actualizado a {nuevo_estado}.', 'exito')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al cambiar estado: {e}', 'error')
+
     return redirect(url_for('pqrsf'))
+
 
 @app.route('/pqrsf/eliminar/<int:solicitud_id>', methods=['POST'])
 def eliminar_pqrsf(solicitud_id):
-    solicitud = db.session.get(PQRSF, solicitud_id)
-    if solicitud:
-        db.session.delete(solicitud)
-        db.session.commit()
-        flash('Registro PQRSF eliminado correctamente.', 'exito')
+    try:
+        solicitud = db.session.get(PQRSF, solicitud_id)
+        if solicitud:
+            db.session.delete(solicitud)
+            db.session.commit()
+            flash('Registro PQRSF eliminado correctamente.', 'exito')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar registro: {e}', 'error')
+
     return redirect(url_for('pqrsf'))
+
 
 @app.route('/pqrsf/exportar-excel')
 def exportar_pqrsf_excel():
