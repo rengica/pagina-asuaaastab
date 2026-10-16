@@ -295,7 +295,14 @@ def contratacion():
     return "<h1>Módulo de Contratación</h1><p>En construcción...</p>"
 
 # -------------------------------------------------------------------------
-# 5. MÓDULO DE PQRSF
+# Configuración de carpeta de subida para PQRSF
+# -------------------------------------------------------------------------
+UPLOAD_FOLDER_PQRSF = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static', 'uploads_pqrsf')
+app.config['UPLOAD_FOLDER_PQRSF'] = UPLOAD_FOLDER_PQRSF
+os.makedirs(UPLOAD_FOLDER_PQRSF, exist_ok=True)
+
+# -------------------------------------------------------------------------
+# 3. MODELO PQRSF COMPLETO
 # -------------------------------------------------------------------------
 class PQRSF(db.Model):
     __tablename__ = 'PQRSF'
@@ -304,120 +311,118 @@ class PQRSF(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     radicado = db.Column(db.String(50), unique=True, nullable=False)
     tipo = db.Column(db.String(50), nullable=False)
-    nombre_solicitante = db.Column(db.String(120), nullable=True)
-    cedula_solicitante = db.Column(db.String(20), nullable=True)
+    nombre = db.Column(db.String(120), nullable=True)
+    documento = db.Column(db.String(30), nullable=True)
     correo = db.Column(db.String(120), nullable=True)
-    telefono = db.Column(db.String(20), nullable=True)
+    telefono = db.Column(db.String(30), nullable=True)
+    direccion = db.Column(db.String(200), nullable=True)
+    sector = db.Column(db.String(100), nullable=True)
     asunto = db.Column(db.String(200), nullable=True)
     descripcion = db.Column(db.Text, nullable=True)
-    estado = db.Column(db.String(30), default='EN TRAMITE')
+    archivo_adjunto = db.Column(db.String(255), nullable=True)
+    estado = db.Column(db.String(30), default='Recibido')
     fecha_radicacion = db.Column(db.DateTime, default=datetime.now)
-    fecha_limite_respuesta = db.Column(db.DateTime, nullable=True)
+    fecha_limite = db.Column(db.DateTime, nullable=True)
+    respuesta = db.Column(db.Text, nullable=True)
+    funcionario_responsable = db.Column(db.String(120), nullable=True)
 
-
+# -------------------------------------------------------------------------
+# 5. MÓDULO DE PQRSF (RUTAS COMPLETAS)
+# -------------------------------------------------------------------------
 @app.route('/pqrsf')
 def pqrsf():
     try:
         solicitudes = PQRSF.query.order_by(PQRSF.fecha_radicacion.desc()).all()
     except Exception as e:
         db.session.rollback()
-        print(f"Error al obtener solicitudes PQRSF: {e}")
+        print(f"Error al consultar PQRSF: {e}")
         solicitudes = []
         
-    total_pqrsf = len(solicitudes)
-    total_pendientes = sum(1 for s in solicitudes if getattr(s, 'estado', 'EN TRAMITE') == 'EN TRAMITE')
-    total_resueltos = sum(1 for s in solicitudes if getattr(s, 'estado', '') == 'RESUELTO')
-    
-    return render_template(
-        'pqrsf.html',
-        solicitudes=solicitudes,
-        total_pqrsf=total_pqrsf,
-        total_pendientes=total_pendientes,
-        total_resueltos=total_resueltos
-    )
+    return render_template('pqrsf.html', solicitudes=solicitudes)
 
 
-@app.route('/pqrsf/guardar', methods=['POST'])
 @app.route('/pqrsf/radicar', methods=['POST'])
-def guardar_pqrsf():
+@app.route('/pqrsf/guardar', methods=['POST'])
+def radicar_pqrsf():
     try:
-        # Generar radicado único
         radicado = f"PQRSF-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-        # Obtener valores soportando ambas convenciones de campos del formulario
-        nombre = request.form.get('nombre_solicitante') or request.form.get('nombre') or ''
-        cedula = request.form.get('cedula_solicitante') or request.form.get('cedula') or ''
         tipo = request.form.get('tipo', 'Petición')
+        documento = request.form.get('documento', '').strip()
+        nombre = request.form.get('nombre', '').strip()
         correo = request.form.get('correo', '').strip()
         telefono = request.form.get('telefono', '').strip()
+        direccion = request.form.get('direccion', '').strip()
+        sector = request.form.get('sector', '').strip()
         asunto = request.form.get('asunto', '').strip()
         descripcion = request.form.get('descripcion', '').strip()
 
-        # Calcular fecha límite de respuesta (15 días hábiles aproximadamente)
+        # Manejo del archivo adjunto
+        file = request.files.get('archivo_soporte')
+        nombre_archivo = None
+        if file and archivo_permitido(file.filename):
+            filename = secure_filename(f"{radicado}_{file.filename}")
+            file.save(os.path.join(app.config['UPLOAD_FOLDER_PQRSF'], filename))
+            nombre_archivo = filename
+
+        # Fecha límite (5 días hábiles aproximadamente / 7 días calendario)
         fecha_radicacion = datetime.now()
-        fecha_limite = fecha_radicacion + timedelta(days=15)
+        fecha_limite = fecha_radicacion + timedelta(days=7)
 
         nueva_solicitud = PQRSF(
             radicado=radicado,
             tipo=tipo,
-            nombre_solicitante=nombre.strip(),
-            cedula_solicitante=cedula.strip(),
+            documento=documento,
+            nombre=nombre,
             correo=correo,
             telefono=telefono,
+            direccion=direccion,
+            sector=sector,
             asunto=asunto,
             descripcion=descripcion,
-            estado='EN TRAMITE',
+            archivo_adjunto=nombre_archivo,
+            estado='Recibido',
             fecha_radicacion=fecha_radicacion,
-            fecha_limite_respuesta=fecha_limite
+            fecha_limite=fecha_limite
         )
 
         db.session.add(nueva_solicitud)
         db.session.commit()
-        flash(f'Solicitud radicado N° {radicado} creada exitosamente.', 'exito')
+        flash(f'Solicitud radicado N° {radicado} guardada exitosamente.', 'exito')
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error crítico al guardar PQRSF: {e}")
-        flash(f'Error al guardar en la base de datos: {e}', 'error')
+        print(f"Error en radicar_pqrsf: {e}")
+        flash(f'Error al registrar solicitud: {e}', 'error')
 
     return redirect(url_for('pqrsf'))
 
 
-@app.route('/pqrsf/radicar-directo', methods=['POST'])
-def radicar_pqrsf():
-    return guardar_pqrsf()
-
-
-@app.route('/pqrsf/cambiar-estado/<int:solicitud_id>', methods=['POST'])
-def cambiar_estado_pqrsf(solicitud_id):
+@app.route('/pqrsf/responder/<int:pqrsf_id>', methods=['POST'])
+def responder_pqrsf(pqrsf_id):
     try:
-        solicitud = db.session.get(PQRSF, solicitud_id)
+        solicitud = db.session.get(PQRSF, pqrsf_id)
         if solicitud:
-            nuevo_estado = request.form.get('estado')
-            if nuevo_estado in ['EN TRAMITE', 'RESUELTO', 'RECHAZADO']:
-                solicitud.estado = nuevo_estado
-                db.session.commit()
-                flash(f'Estado del radicado {solicitud.radicado} actualizado a {nuevo_estado}.', 'exito')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al cambiar estado: {e}', 'error')
-
-    return redirect(url_for('pqrsf'))
-
-
-@app.route('/pqrsf/eliminar/<int:solicitud_id>', methods=['POST'])
-def eliminar_pqrsf(solicitud_id):
-    try:
-        solicitud = db.session.get(PQRSF, solicitud_id)
-        if solicitud:
-            db.session.delete(solicitud)
+            solicitud.estado = request.form.get('estado', 'Resuelto')
+            solicitud.funcionario_responsable = request.form.get('funcionario_responsable', '').strip()
+            solicitud.respuesta = request.form.get('respuesta', '').strip()
             db.session.commit()
-            flash('Registro PQRSF eliminado correctamente.', 'exito')
+            flash(f'Respuesta guardada para el radicado {solicitud.radicado}.', 'exito')
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al eliminar registro: {e}', 'error')
+        flash(f'Error al guardar respuesta: {e}', 'error')
 
     return redirect(url_for('pqrsf'))
+
+
+@app.route('/pqrsf/descargar-respuesta/<int:pqrsf_id>')
+def descargar_respuesta_pqrsf(pqrsf_id):
+    solicitud = db.session.get(PQRSF, pqrsf_id)
+    if not solicitud:
+        flash('Solicitud no encontrada.', 'error')
+        return redirect(url_for('pqrsf'))
+    
+    # Genera una vista de impresión/descarga del documento de respuesta
+    return render_template('certificado_pago_anticipado_print.html', pago=solicitud)
 
 
 @app.route('/pqrsf/exportar-excel')
@@ -433,14 +438,19 @@ def exportar_pqrsf_excel():
         datos.append({
             'Radicado': getattr(s, 'radicado', ''),
             'Tipo': getattr(s, 'tipo', ''),
-            'Solicitante': getattr(s, 'nombre_solicitante', ''),
-            'Cédula': getattr(s, 'cedula_solicitante', ''),
+            'Solicitante': getattr(s, 'nombre', ''),
+            'Cédula / Documento': getattr(s, 'documento', ''),
             'Correo': getattr(s, 'correo', ''),
             'Teléfono': getattr(s, 'telefono', ''),
+            'Dirección': getattr(s, 'direccion', ''),
+            'Sector': getattr(s, 'sector', ''),
             'Asunto': getattr(s, 'asunto', ''),
             'Descripción': getattr(s, 'descripcion', ''),
             'Estado': getattr(s, 'estado', ''),
-            'Fecha Radicación': s.fecha_radicacion.strftime('%Y-%m-%d %H:%M') if getattr(s, 'fecha_radicacion', None) else ''
+            'Fecha Radicación': s.fecha_radicacion.strftime('%Y-%m-%d %H:%M') if getattr(s, 'fecha_radicacion', None) else '',
+            'Fecha Límite': s.fecha_limite.strftime('%Y-%m-%d') if getattr(s, 'fecha_limite', None) else '',
+            'Funcionario Responsable': getattr(s, 'funcionario_responsable', ''),
+            'Respuesta': getattr(s, 'respuesta', '')
         })
 
     df = pd.DataFrame(datos)
